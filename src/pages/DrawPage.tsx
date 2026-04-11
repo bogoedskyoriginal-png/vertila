@@ -30,7 +30,7 @@ function toSpectatorConfig(publicConfig: PublicConfigResponse["config"]): AppCon
 
 export function DrawPage() {
   const params = useParams();
-  const showId = params.showId ?? null;
+  const code = (params.code ?? null) as string | null;
 
   const [remoteConfig, setRemoteConfig] = useState<AppConfig | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
@@ -50,8 +50,8 @@ export function DrawPage() {
     let cancelled = false;
 
     async function load() {
-      if (!showId) {
-        setRemoteError("Нужна spectator ссылка вида /draw/<showId>.");
+      if (!code) {
+        setRemoteError("Нужна spectator ссылка вида /draw/<code>.");
         setRemoteConfig(null);
         setSessionId(null);
         revealStartedRef.current = false;
@@ -64,12 +64,12 @@ export function DrawPage() {
       revealStartedRef.current = false;
 
       try {
-        const data = await apiGet<PublicConfigResponse>(`/api/shows/${encodeURIComponent(showId)}/config`);
+        const data = await apiGet<PublicConfigResponse>(`/api/shows/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
         setRemoteConfig(toSpectatorConfig(data.config));
 
         const session = await apiSend<SessionResponse>(
-          `/api/shows/${encodeURIComponent(showId)}/session`,
+          `/api/shows/${encodeURIComponent(code)}/session`,
           "POST",
           {}
         );
@@ -85,11 +85,11 @@ export function DrawPage() {
     return () => {
       cancelled = true;
     };
-  }, [showId]);
+  }, [code]);
 
   useEffect(() => {
     async function reveal() {
-      if (!showId) return;
+      if (!code) return;
       if (!sessionId) return;
       if (revealStartedRef.current) return;
       if (classifier.appState !== "locked") return;
@@ -98,7 +98,7 @@ export function DrawPage() {
       revealStartedRef.current = true;
       try {
         const data = await apiSend<RevealResponse>(
-          `/api/shows/${encodeURIComponent(showId)}/reveal`,
+          `/api/shows/${encodeURIComponent(code)}/reveal`,
           "POST",
           { sessionId, resultIndex: hidden.classifiedResultIndex }
         );
@@ -114,7 +114,7 @@ export function DrawPage() {
     }
 
     reveal();
-  }, [classifier.appState, hidden.classifiedResultIndex, sessionId, showId]);
+  }, [classifier.appState, hidden.classifiedResultIndex, sessionId, code]);
 
   const enableLabel = useMemo(() => {
     if (classifier.appState === "requestingPermission") return "Разрешение…";
@@ -130,7 +130,7 @@ export function DrawPage() {
       return { visible: true, title: "Ошибка", subtitle: remoteError, value: undefined as number | undefined };
     }
 
-    if (showId && !remoteConfig) {
+    if (code && !remoteConfig) {
       return { visible: true, title: "Загрузка", subtitle: "Подготовка…", value: undefined as number | undefined };
     }
 
@@ -152,7 +152,7 @@ export function DrawPage() {
     }
 
     return { visible: false, title: "", subtitle: undefined as string | undefined, value: undefined as number | undefined };
-  }, [classifier.appState, classifier.countdownValue, remoteConfig, remoteError, showId]);
+  }, [classifier.appState, classifier.countdownValue, remoteConfig, remoteError, code]);
 
   return (
     <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -192,7 +192,7 @@ export function DrawPage() {
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Debug</div>
           <div className="col" style={{ gap: 6, fontSize: 12 }}>
             <div>
-              showId: <span className="kbd">{String(showId)}</span>
+              code: <span className="kbd">{String(code)}</span>
             </div>
             <div>
               sessionId: <span className="kbd">{sessionId ? "yes" : "no"}</span>

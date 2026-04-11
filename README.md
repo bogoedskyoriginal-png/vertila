@@ -1,16 +1,20 @@
 # Vertila — Magic Draw
 
-Система для фокуса с предсказанием:
-- **Master Admin** генерирует 2 ссылки для каждого покупателя (фокусника):
-  - ссылка **фокусника** (настройки)
-  - ссылка **зрителя** (рисовалка)
-- Настройки, сделанные фокусником, применяются к зрительской ссылке.
+## Идея
+
+Есть мастер-админка, которая генерирует 5-символьный код шоу (например `TY1QZ`).
+
+Дальше получаются две короткие ссылки:
+- зритель: `https://domain/TY1QZ`
+- фокусник: `https://domain/TY1QZ/admin`
+
+Если код не создан через Master Admin — по нему ничего не откроется.
 
 ## Роуты
 
-- `/master` — мастер-админ (чёрный фон/белые элементы), генерирует ссылки
-- `/admin/:showId?key=...` — админка фокусника для конкретного шоу
-- `/draw/:showId` — spectator page (телефон зрителя)
+- `/master` — мастер-админ (генерация кодов)
+- `/:code` — spectator page
+- `/:code/admin` — magician admin
 
 ## Backend
 
@@ -19,11 +23,11 @@ Backend — Node/Express + файловое хранилище (JSON).
 Важно: **без Render Persistent Disk** данные могут сбрасываться при редеплое/рестарте.
 
 API:
-- `POST /api/master/shows` (Basic Auth) → создаёт шоу, возвращает `{showId, adminKey}`
-- `GET /api/shows/:id/config` → public-config (без текстов/картинок предсказаний)
-- `GET/PUT /api/shows/:id/admin` (header `x-admin-key`) → полный конфиг для фокусника
-- `POST /api/shows/:id/session` → выдаёт `sessionId`
-- `POST /api/shows/:id/reveal` → выдаёт одно предсказание после `locked`
+- `POST /api/master/shows` (Basic Auth) → создаёт шоу, возвращает `{showCode, adminKey}`
+- `GET /api/shows/:code/config` → public-config (без текстов/картинок предсказаний)
+- `GET/PUT /api/shows/:code/admin` (header `x-admin-key`) → полный конфиг для фокусника
+- `POST /api/shows/:code/session` → выдаёт `sessionId`
+- `POST /api/shows/:code/reveal` → выдаёт одно предсказание после `locked`
 
 ## Локальный запуск
 
@@ -31,10 +35,6 @@ API:
 npm install
 npm run dev
 ```
-
-По умолчанию:
-- frontend: `http://localhost:5173`
-- backend: `http://localhost:8787`
 
 Env vars (опционально):
 - `MASTER_USER` (по умолчанию `master`)
@@ -53,9 +53,12 @@ Env vars (опционально):
 
 5) Рекомендуется: добавь **Persistent Disk** и примонтируй в `/data`.
 
-## Как пользоваться (быстро)
+## Использование (быстро)
 
 1) Открой `/master`, введи логин/пароль мастера, нажми **Generate links**.
-2) Отдай фокуснику ссылку **Magician admin (private)**.
-3) Фокусник на своей ссылке настроит предсказания/mapping → **Save to server**.
-4) Зрителю даёшь `/draw/:showId` — там подхватятся настройки.
+2) В Master скопируй:
+   - spectator link (для телефона зрителя)
+   - magician link (для фокусника)
+   - admin key (фокусник введёт его один раз при входе)
+3) Фокусник на `/:code/admin` настраивает → жмёт **Save to server**.
+4) Зритель открывает `/:code` — настройки подхватываются.

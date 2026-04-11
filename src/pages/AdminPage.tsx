@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import type { AppMode, Direction4, PredictionId } from "../types/config";
 import { AdminPredictionForm } from "../components/AdminPredictionForm";
 import { AdminMotionSettingsForm } from "../components/AdminMotionSettingsForm";
@@ -32,55 +32,79 @@ function PredictionSelect({
   );
 }
 
+function storageKey(code: string) {
+  return `magic-admin-key:${code}`;
+}
+
 export function AdminPage() {
   const params = useParams();
-  const showId = params.showId ?? null;
-  const [searchParams] = useSearchParams();
-  const adminKey = searchParams.get("key") ?? "";
+  const code = (params.code ?? "").toUpperCase();
 
   const config = useAppConfigStore((c) => c);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
 
+  const [adminKey, setAdminKey] = useState<string>("");
+  const [adminKeyInput, setAdminKeyInput] = useState<string>("");
+
+  useEffect(() => {
+    if (!code) return;
+    const saved = localStorage.getItem(storageKey(code)) ?? "";
+    setAdminKey(saved);
+    setAdminKeyInput("");
+  }, [code]);
+
   const spectatorLink = useMemo(() => {
-    if (!showId) return "";
-    return `${window.location.origin}/draw/${encodeURIComponent(showId)}`;
-  }, [showId]);
+    if (!code) return "";
+    return `${window.location.origin}/${encodeURIComponent(code)}`;
+  }, [code]);
 
   const predictionOptions = useMemo(() => {
     const count = config.mode === 4 ? 4 : 8;
     return config.predictions.slice(0, count).map((p) => ({ id: p.id, label: `${p.id}. ${p.label}` }));
   }, [config.mode, config.predictions]);
 
+  async function loadFromServer(key: string) {
+    const res = await apiGet<AdminConfigResponse>(`/api/shows/${encodeURIComponent(code)}/admin`, {
+      headers: { "x-admin-key": key }
+    });
+    updateAppConfig(() => res.config);
+  }
+
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      if (!showId || !adminKey) return;
+
+    async function boot() {
+      if (!code) return;
+      if (!adminKey) return;
+
       setLoading(true);
       try {
-        const res = await apiGet<AdminConfigResponse>(`/api/shows/${encodeURIComponent(showId)}/admin`, {
-          headers: { "x-admin-key": adminKey }
-        });
+        await loadFromServer(adminKey);
         if (cancelled) return;
-        updateAppConfig(() => res.config);
-        setToast("Loaded from server");
-        window.setTimeout(() => setToast(null), 1500);
+        setToast("Loaded");
       } catch (e) {
         if (cancelled) return;
         setToast(e instanceof Error ? `Load failed: ${e.message}` : "Load failed");
-        window.setTimeout(() => setToast(null), 2500);
+        // invalidate stored key on unauthorized
+        localStorage.removeItem(storageKey(code));
+        setAdminKey("");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          window.setTimeout(() => setToast(null), 2000);
+        }
       }
     }
-    load();
+
+    boot();
     return () => {
       cancelled = true;
     };
-  }, [adminKey, showId]);
+  }, [adminKey, code]);
 
-  if (!showId || !adminKey) {
+  if (!code) {
     return (
       <div style={{ minHeight: "100vh", background: "#050507", color: "#fff", padding: 18 }}>
         <div style={{ maxWidth: 820, margin: "0 auto" }}>
@@ -94,16 +118,78 @@ export function AdminPage() {
             }}
           >
             <div style={{ opacity: 0.8, fontSize: 13, lineHeight: 1.4 }}>
-              Открой эту страницу по ссылке, которую сгенерировал Master Admin.
-              Она выглядит так:
-              <div style={{ marginTop: 8, fontFamily: "ui-monospace", fontSize: 12, opacity: 0.85 }}>
-                /admin/&lt;showId&gt;?key=&lt;adminKey&gt;
-              </div>
+              Нужна ссылка вида <span style={{ fontFamily: "ui-monospace" }}>/&lt;CODE&gt;/admin</span>.
             </div>
-            <div style={{ marginTop: 12 }}>
-              <a href="/master" style={{ color: "#fff" }}>
-                Перейти в Master Admin
-              </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!adminKey) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#050507", color: "#fff", padding: 18 }}>
+        <div style={{ maxWidth: 820, margin: "0 auto" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Magician Admin</div>
+          <div
+            style={{
+              background: "#0b0b10",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 14,
+              padding: 14
+            }}
+          >
+            <div style={{ opacity: 0.8, fontSize: 13, lineHeight: 1.4, marginBottom: 10 }}>
+              Введите <b>Admin key</b>, который выдал Master Admin.
+            </div>
+            <input
+              value={adminKeyInput}
+              onChange={(e) => setAdminKeyInput(e.target.value)}
+              placeholder="admin key"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "#06060a",
+                color: "#fff",
+                outline: "none"
+              }}
+            />
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+              <button
+                onClick={() => {
+                  const k = adminKeyInput.trim();
+                  if (!k) return;
+                  localStorage.setItem(storageKey(code), k);
+                  setAdminKey(k);
+                }}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "#ffffff",
+                  color: "#050507",
+                  fontWeight: 800,
+                  cursor: "pointer"
+                }}
+              >
+                Unlock
+              </button>
+              <button
+                onClick={() => window.location.assign("/master")}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "transparent",
+                  color: "#fff",
+                  cursor: "pointer"
+                }}
+              >
+                Go to Master
+              </button>
             </div>
           </div>
         </div>
@@ -123,10 +209,7 @@ export function AdminPage() {
           borderColor: "rgba(255,255,255,0.12)"
         }}
       >
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Magician Admin</div>
-        <div className="hint" style={{ color: "rgba(255,255,255,0.7)" }}>
-          Настройки сохраняются на сервере и применяются к spectator ссылке.
-        </div>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>Magician Admin — {code}</div>
         <div className="hint" style={{ color: "rgba(255,255,255,0.7)", wordBreak: "break-all" }}>
           Spectator: {spectatorLink}
         </div>
@@ -138,7 +221,7 @@ export function AdminPage() {
               setLoading(true);
               try {
                 await apiSend<{ ok: boolean }>(
-                  `/api/shows/${encodeURIComponent(showId)}/admin`,
+                  `/api/shows/${encodeURIComponent(code)}/admin`,
                   "PUT",
                   { config },
                   { "x-admin-key": adminKey }
@@ -160,10 +243,7 @@ export function AdminPage() {
             onClick={async () => {
               setLoading(true);
               try {
-                const res = await apiGet<AdminConfigResponse>(`/api/shows/${encodeURIComponent(showId)}/admin`, {
-                  headers: { "x-admin-key": adminKey }
-                });
-                updateAppConfig(() => res.config);
+                await loadFromServer(adminKey);
                 setToast("Reloaded");
               } catch (e) {
                 setToast(e instanceof Error ? `Reload failed: ${e.message}` : "Reload failed");
@@ -193,6 +273,17 @@ export function AdminPage() {
             }}
           >
             Reset local
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              localStorage.removeItem(storageKey(code));
+              setAdminKey("");
+              setToast("Locked");
+              window.setTimeout(() => setToast(null), 1200);
+            }}
+          >
+            Lock
           </button>
         </div>
         {toast && <div className="hint" style={{ marginTop: 8, color: "rgba(255,255,255,0.7)" }}>{toast}</div>}

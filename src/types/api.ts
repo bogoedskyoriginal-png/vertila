@@ -1,7 +1,7 @@
 import type { AppConfig } from "./config";
 
 export type CreateShowResponse = {
-  showId: string;
+  showCode: string;
   adminKey: string;
 };
 

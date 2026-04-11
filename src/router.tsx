@@ -11,10 +11,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/master" replace /> },
       { path: "master", element: <MasterPage /> },
-      { path: "admin", element: <Navigate to="/master" replace /> },
-      { path: "admin/:showId", element: <AdminPage /> },
-      { path: "draw/:showId", element: <DrawPage /> },
-      { path: "draw", element: <DrawPage /> }
+      { path: ":code/admin", element: <AdminPage /> },
+      { path: ":code", element: <DrawPage /> }
     ]
   }
 ]);

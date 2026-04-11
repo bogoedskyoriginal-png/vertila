@@ -36,8 +36,10 @@ export function MasterPage() {
     if (!created) return null;
     const base = window.location.origin;
     return {
-      magicianAdmin: `${base}/admin/${encodeURIComponent(created.showId)}?key=${encodeURIComponent(created.adminKey)}`,
-      spectator: `${base}/draw/${encodeURIComponent(created.showId)}`
+      showCode: created.showCode,
+      adminKey: created.adminKey,
+      magicianAdmin: `${base}/${encodeURIComponent(created.showCode)}/admin`,
+      spectator: `${base}/${encodeURIComponent(created.showCode)}`
     };
   }, [created]);
 
@@ -151,11 +153,17 @@ export function MasterPage() {
         >
           <div style={{ fontWeight: 800, marginBottom: 10 }}>Links</div>
 
+          <div style={{ fontSize: 12, opacity: 0.75 }}>Show code</div>
+          <div style={{ fontFamily: "ui-monospace", marginBottom: 10 }}>{links?.showCode || "—"}</div>
+
           <div style={{ fontSize: 12, opacity: 0.75 }}>Magician admin (private)</div>
           <div style={{ wordBreak: "break-all", marginBottom: 10 }}>{links?.magicianAdmin || "—"}</div>
 
           <div style={{ fontSize: 12, opacity: 0.75 }}>Spectator</div>
-          <div style={{ wordBreak: "break-all" }}>{links?.spectator || "—"}</div>
+          <div style={{ wordBreak: "break-all", marginBottom: 10 }}>{links?.spectator || "—"}</div>
+
+          <div style={{ fontSize: 12, opacity: 0.75 }}>Admin key (для входа в /admin)</div>
+          <div style={{ wordBreak: "break-all", fontFamily: "ui-monospace" }}>{links?.adminKey || "—"}</div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
             <button
@@ -190,7 +198,7 @@ export function MasterPage() {
             </button>
             <button
               disabled={!links}
-              onClick={() => links && window.open(links.spectator, "_blank")}
+              onClick={() => links && navigator.clipboard.writeText(links.adminKey)}
               style={{
                 padding: "10px 14px",
                 borderRadius: 12,
@@ -201,12 +209,12 @@ export function MasterPage() {
                 opacity: links ? 1 : 0.5
               }}
             >
-              Open spectator
+              Copy admin key
             </button>
           </div>
 
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 12 }}>
-            Дальше: открой magician admin link и настрой предсказания/маппинг. Эти настройки применятся к spectator link.
+            Важно: если шоу не создано через Master — по коду ничего не откроется.
           </div>
         </div>
       </div>

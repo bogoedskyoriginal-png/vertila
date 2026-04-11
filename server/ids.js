@@ -1,13 +1,14 @@
 import crypto from "node:crypto";
 
-export function makeShowId() {
-  const bytes = crypto.randomBytes(9);
-  return bytes
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "")
-    .slice(0, 12);
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 chars, no O/0/I/1
+
+export function makeShowCode(len = 5) {
+  const bytes = crypto.randomBytes(len);
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += ALPHABET[bytes[i] % ALPHABET.length];
+  }
+  return out;
 }
 
 export function makeAdminKey() {
