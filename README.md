@@ -14,20 +14,18 @@
 
 ## Backend
 
-Backend — Node/Express + Postgres.
+Backend — Node/Express + файловое хранилище (JSON).
+
+Важно: **без Render Persistent Disk** данные могут сбрасываться при редеплое/рестарте.
 
 API:
-- `POST /api/master/shows` (header `Basic Auth (Authorization)`) → создаёт шоу, возвращает `{showId, adminKey}`
+- `POST /api/master/shows` (Basic Auth) → создаёт шоу, возвращает `{showId, adminKey}`
 - `GET /api/shows/:id/config` → public-config (без текстов/картинок предсказаний)
 - `GET/PUT /api/shows/:id/admin` (header `x-admin-key`) → полный конфиг для фокусника
 - `POST /api/shows/:id/session` → выдаёт `sessionId`
 - `POST /api/shows/:id/reveal` → выдаёт одно предсказание после `locked`
 
 ## Локальный запуск
-
-Нужен Postgres и переменные окружения:
-- `DATABASE_URL` (строка подключения Postgres)
-- `MASTER_USER / MASTER_PASS` (секрет для страницы `/master`)
 
 ```bash
 npm install
@@ -38,21 +36,26 @@ npm run dev
 - frontend: `http://localhost:5173`
 - backend: `http://localhost:8787`
 
-## Деплой на Render
+Env vars (опционально):
+- `MASTER_USER` (по умолчанию `master`)
+- `MASTER_PASS` (по умолчанию `master123`)
+- `STORE_PATH` (например `./data/store.json`)
 
-1) Создай Postgres в Render.
-2) Создай Web Service из этого репозитория.
-3) Env vars в Web Service:
-- `DATABASE_URL` — из Postgres
-- `MASTER_USER / MASTER_PASS` — придумай и сохрани
+## Деплой на Render (один Web Service)
 
-Команды:
-- Build: `npm install && npm run build`
-- Start: `npm run start`
+1) New → **Web Service** → подключи репозиторий.
+2) Build: `npm install && npm run build`
+3) Start: `npm run start`
+4) Env vars:
+- `MASTER_USER`
+- `MASTER_PASS`
+- `STORE_PATH` = `/data/store.json`
+
+5) Рекомендуется: добавь **Persistent Disk** и примонтируй в `/data`.
 
 ## Как пользоваться (быстро)
 
-1) Открой `/master`, введи `MASTER_USER / MASTER_PASS`, нажми **Generate links**.
+1) Открой `/master`, введи логин/пароль мастера, нажми **Generate links**.
 2) Отдай фокуснику ссылку **Magician admin (private)**.
 3) Фокусник на своей ссылке настроит предсказания/mapping → **Save to server**.
 4) Зрителю даёшь `/draw/:showId` — там подхватятся настройки.
