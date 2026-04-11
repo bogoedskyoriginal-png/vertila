@@ -1,22 +1,125 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import { DrawingCanvas } from "../components/DrawingCanvas";
 import { Toolbar } from "../components/Toolbar";
 import { CountdownOverlay } from "../components/CountdownOverlay";
 import { useAppConfigStore } from "../store/useAppConfigStore";
-import { resetSpectatorHiddenState, useSpectatorStateStore } from "../store/useSpectatorStateStore";
+import {
+  resetSpectatorHiddenState,
+  updateSpectatorHiddenState,
+  useSpectatorStateStore
+} from "../store/useSpectatorStateStore";
 import { useMotionClassifier } from "../hooks/useMotionClassifier";
+import type { AppConfig } from "../types/config";
+import { apiGet, apiSend } from "../utils/api";
+import type { PublicConfigResponse, RevealResponse, SessionResponse } from "../types/api";
 
 const PALETTE = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
+function toSpectatorConfig(publicConfig: PublicConfigResponse["config"]): AppConfig {
+  // public config comes without prediction texts/images
+  return {
+    ...publicConfig,
+    predictions: publicConfig.predictions.map((p) => ({
+      id: p.id as any,
+      label: p.label,
+      text: "",
+      imageDataUrl: ""
+    }))
+  } as AppConfig;
+}
+
 export function DrawPage() {
-  const config = useAppConfigStore((c) => c);
-  const ui = config.ui;
+  const params = useParams();
+  const showId = params.showId ?? null;
+
+  const localConfig = useAppConfigStore((c) => c);
+
+  const [remoteConfig, setRemoteConfig] = useState<AppConfig | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  const effectiveConfig = showId ? remoteConfig : localConfig;
 
   const [color, setColor] = useState<string>(PALETTE[0]);
   const [canvasApi, setCanvasApi] = useState<{ clear: () => void } | null>(null);
-  const classifier = useMotionClassifier(config);
+
+  const classifier = useMotionClassifier(effectiveConfig ?? localConfig);
+  const ui = (effectiveConfig ?? localConfig).ui;
 
   const hidden = useSpectatorStateStore((s) => s);
+
+  const revealStartedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!showId) {
+        setRemoteConfig(null);
+        setRemoteError(null);
+        setSessionId(null);
+        revealStartedRef.current = false;
+        return;
+      }
+
+      setRemoteError(null);
+      setRemoteConfig(null);
+      setSessionId(null);
+      revealStartedRef.current = false;
+
+      try {
+        const data = await apiGet<PublicConfigResponse>(`/api/shows/${encodeURIComponent(showId)}/config`);
+        if (cancelled) return;
+        setRemoteConfig(toSpectatorConfig(data.config));
+
+        const session = await apiSend<SessionResponse>(
+          `/api/shows/${encodeURIComponent(showId)}/session`,
+          "POST",
+          {}
+        );
+        if (cancelled) return;
+        setSessionId(session.sessionId);
+      } catch (e) {
+        if (cancelled) return;
+        setRemoteError(e instanceof Error ? e.message : "Не удалось загрузить настройки");
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [showId]);
+
+  useEffect(() => {
+    async function reveal() {
+      if (!showId) return;
+      if (!sessionId) return;
+      if (revealStartedRef.current) return;
+      if (classifier.appState !== "locked") return;
+      if (!hidden.classifiedResultIndex) return;
+
+      revealStartedRef.current = true;
+      try {
+        const data = await apiSend<RevealResponse>(
+          `/api/shows/${encodeURIComponent(showId)}/reveal`,
+          "POST",
+          { sessionId, resultIndex: hidden.classifiedResultIndex }
+        );
+
+        updateSpectatorHiddenState((prev) => ({
+          ...prev,
+          selectedPredictionText: data.predictionText?.trim() ? data.predictionText : null,
+          selectedPredictionImageDataUrl: data.predictionImageDataUrl?.trim() ? data.predictionImageDataUrl : null
+        }));
+      } catch {
+        // ignore
+      }
+    }
+
+    reveal();
+  }, [classifier.appState, hidden.classifiedResultIndex, sessionId, showId]);
 
   const enableLabel = useMemo(() => {
     if (classifier.appState === "requestingPermission") return "Разрешение…";
@@ -28,6 +131,24 @@ export function DrawPage() {
   }, [classifier.appState]);
 
   const overlay = useMemo(() => {
+    if (remoteError) {
+      return {
+        visible: true,
+        title: "Ошибка",
+        subtitle: remoteError,
+        value: undefined as number | undefined
+      };
+    }
+
+    if (showId && !remoteConfig) {
+      return {
+        visible: true,
+        title: "Загрузка",
+        subtitle: "Подготовка…",
+        value: undefined as number | undefined
+      };
+    }
+
     if (classifier.appState === "countdown") {
       return {
         visible: true,
@@ -44,13 +165,14 @@ export function DrawPage() {
         value: undefined as number | undefined
       };
     }
+
     return {
       visible: false,
       title: "",
       subtitle: undefined as string | undefined,
       value: undefined as number | undefined
     };
-  }, [classifier.appState, classifier.countdownValue]);
+  }, [classifier.appState, classifier.countdownValue, remoteConfig, remoteError, showId]);
 
   return (
     <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -67,6 +189,7 @@ export function DrawPage() {
         onResetHiddenState={() => {
           classifier.resetClassifier();
           resetSpectatorHiddenState();
+          revealStartedRef.current = false;
         }}
         colors={PALETTE}
         selectedColor={color}
@@ -88,6 +211,12 @@ export function DrawPage() {
         <div className="card" style={{ padding: 12, marginTop: 10 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Debug</div>
           <div className="col" style={{ gap: 6, fontSize: 12 }}>
+            <div>
+              showId: <span className="kbd">{String(showId)}</span>
+            </div>
+            <div>
+              sessionId: <span className="kbd">{sessionId ? "yes" : "no"}</span>
+            </div>
             <div>
               state: <span className="kbd">{classifier.appState}</span>
             </div>
