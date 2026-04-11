@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { DrawingCanvas } from "../components/DrawingCanvas";
 import { Toolbar } from "../components/Toolbar";
 import { CountdownOverlay } from "../components/CountdownOverlay";
-import { useAppConfigStore } from "../store/useAppConfigStore";
 import {
   resetSpectatorHiddenState,
   updateSpectatorHiddenState,
@@ -11,13 +10,13 @@ import {
 } from "../store/useSpectatorStateStore";
 import { useMotionClassifier } from "../hooks/useMotionClassifier";
 import type { AppConfig } from "../types/config";
+import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
 import type { PublicConfigResponse, RevealResponse, SessionResponse } from "../types/api";
 
 const PALETTE = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
 function toSpectatorConfig(publicConfig: PublicConfigResponse["config"]): AppConfig {
-  // public config comes without prediction texts/images
   return {
     ...publicConfig,
     predictions: publicConfig.predictions.map((p) => ({
@@ -33,22 +32,18 @@ export function DrawPage() {
   const params = useParams();
   const showId = params.showId ?? null;
 
-  const localConfig = useAppConfigStore((c) => c);
-
   const [remoteConfig, setRemoteConfig] = useState<AppConfig | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const effectiveConfig = showId ? remoteConfig : localConfig;
-
   const [color, setColor] = useState<string>(PALETTE[0]);
   const [canvasApi, setCanvasApi] = useState<{ clear: () => void } | null>(null);
 
-  const classifier = useMotionClassifier(effectiveConfig ?? localConfig);
-  const ui = (effectiveConfig ?? localConfig).ui;
+  const baseConfig = remoteConfig ?? DEFAULT_CONFIG;
+  const classifier = useMotionClassifier(baseConfig);
+  const ui = baseConfig.ui;
 
   const hidden = useSpectatorStateStore((s) => s);
-
   const revealStartedRef = useRef(false);
 
   useEffect(() => {
@@ -56,8 +51,8 @@ export function DrawPage() {
 
     async function load() {
       if (!showId) {
+        setRemoteError("Нужна spectator ссылка вида /draw/<showId>.");
         setRemoteConfig(null);
-        setRemoteError(null);
         setSessionId(null);
         revealStartedRef.current = false;
         return;
@@ -132,21 +127,11 @@ export function DrawPage() {
 
   const overlay = useMemo(() => {
     if (remoteError) {
-      return {
-        visible: true,
-        title: "Ошибка",
-        subtitle: remoteError,
-        value: undefined as number | undefined
-      };
+      return { visible: true, title: "Ошибка", subtitle: remoteError, value: undefined as number | undefined };
     }
 
     if (showId && !remoteConfig) {
-      return {
-        visible: true,
-        title: "Загрузка",
-        subtitle: "Подготовка…",
-        value: undefined as number | undefined
-      };
+      return { visible: true, title: "Загрузка", subtitle: "Подготовка…", value: undefined as number | undefined };
     }
 
     if (classifier.appState === "countdown") {
@@ -166,12 +151,7 @@ export function DrawPage() {
       };
     }
 
-    return {
-      visible: false,
-      title: "",
-      subtitle: undefined as string | undefined,
-      value: undefined as number | undefined
-    };
+    return { visible: false, title: "", subtitle: undefined as string | undefined, value: undefined as number | undefined };
   }, [classifier.appState, classifier.countdownValue, remoteConfig, remoteError, showId]);
 
   return (
@@ -221,26 +201,7 @@ export function DrawPage() {
               state: <span className="kbd">{classifier.appState}</span>
             </div>
             <div>
-              sensorAvailable: <span className="kbd">{String(classifier.sensorAvailable)}</span>
-            </div>
-            <div>
-              permissionGranted: <span className="kbd">{String(classifier.permissionGranted)}</span>
-            </div>
-            {classifier.permissionError && (
-              <div style={{ color: "#b91c1c" }}>
-                permissionError: <span className="kbd">{classifier.permissionError}</span>
-              </div>
-            )}
-            {classifier.experimentalNote && <div className="hint">{classifier.experimentalNote}</div>}
-            <div className="divider" />
-            <div>
-              classifiedDirection: <span className="kbd">{String(hidden.classifiedDirection)}</span>
-            </div>
-            <div>
               classifiedResultIndex: <span className="kbd">{String(hidden.classifiedResultIndex)}</span>
-            </div>
-            <div>
-              confidenceScore: <span className="kbd">{String(hidden.confidenceScore)}</span>
             </div>
             <div>
               selectedPredictionText: <span className="kbd">{String(hidden.selectedPredictionText)}</span>

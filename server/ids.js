@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 
 export function makeShowId() {
-  // 12 chars base64url-ish
   const bytes = crypto.randomBytes(9);
   return bytes
     .toString("base64")
@@ -19,9 +18,9 @@ export function makeSessionId() {
   return crypto.randomUUID();
 }
 
-export function safeEqual(a: string, b: string) {
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
+export function safeEqual(a, b) {
+  const aBuf = Buffer.from(String(a));
+  const bBuf = Buffer.from(String(b));
   if (aBuf.length !== bBuf.length) return false;
   return crypto.timingSafeEqual(aBuf, bBuf);
 }

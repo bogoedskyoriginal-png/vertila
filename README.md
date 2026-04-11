@@ -1,51 +1,58 @@
-# Vertila — Magic Draw (MVP)
+# Vertila — Magic Draw
 
-Веб-продукт для фокуса с предсказанием:
-- **/draw** — spectator page (обычная рисовалка) + скрытая классификация движения телефона
-- **/admin** — админка фокусника (настройки предсказаний/mapping/таймингов/UI)
+Система для фокуса с предсказанием:
+- **Master Admin** генерирует 2 ссылки для каждого покупателя (фокусника):
+  - ссылка **фокусника** (настройки)
+  - ссылка **зрителя** (рисовалка)
+- Настройки, сделанные фокусником, применяются к зрительской ссылке.
 
-## Запуск локально
+## Роуты
+
+- `/master` — мастер-админ (чёрный фон/белые элементы), генерирует ссылки
+- `/admin/:showId?key=...` — админка фокусника для конкретного шоу
+- `/draw/:showId` — spectator page (телефон зрителя)
+
+## Backend
+
+Backend — Node/Express + Postgres.
+
+API:
+- `POST /api/master/shows` (header `x-master-token`) → создаёт шоу, возвращает `{showId, adminKey}`
+- `GET /api/shows/:id/config` → public-config (без текстов/картинок предсказаний)
+- `GET/PUT /api/shows/:id/admin` (header `x-admin-key`) → полный конфиг для фокусника
+- `POST /api/shows/:id/session` → выдаёт `sessionId`
+- `POST /api/shows/:id/reveal` → выдаёт одно предсказание после `locked`
+
+## Локальный запуск
+
+Нужен Postgres и переменные окружения:
+- `DATABASE_URL` (строка подключения Postgres)
+- `MASTER_TOKEN` (секрет для страницы `/master`)
 
 ```bash
 npm install
-npm run dev -- --host
+npm run dev
 ```
 
-- `http://localhost:5173/draw`
-- `http://localhost:5173/admin`
+По умолчанию:
+- frontend: `http://localhost:5173`
+- backend: `http://localhost:8787`
 
-## Деплой на Vercel (с backend для переноса настроек)
+## Деплой на Render
 
-В этом репозитории есть Vercel serverless API (`/api/shows/*`) на **Vercel KV**.
+1) Создай Postgres в Render.
+2) Создай Web Service из этого репозитория.
+3) Env vars в Web Service:
+- `DATABASE_URL` — из Postgres
+- `MASTER_TOKEN` — придумай и сохрани
 
-1) В Vercel создайте **KV** (Storage → KV) и attach к проекту.
-2) Перезапустите Deploy.
+Команды:
+- Build: `npm install && npm run build`
+- Start: `npm run start`
 
-## Как пользоваться (ключевое)
+## Как пользоваться (быстро)
 
-### Вариант A — без backend
-Админка и spectator работают только в рамках **одного устройства/браузера** (через localStorage).
-
-### Вариант B — как нужно для шоу (настроил на ноуте → открыл на телефоне)
-1) На ноутбуке откройте `/admin`, настройте предсказания и mapping.
-2) В блоке **Backend (Show links)** нажмите **Create show on server**.
-3) (Если меняли настройки после создания) нажмите **Push updates**.
-4) Скопируйте **Spectator link** и откройте его на телефоне зрителя.
-
-Формат ссылки:
-- spectator: `/draw/<showId>`
-- admin (private): `/admin?show=<showId>&key=<adminKey>`
-
-## Секретность предсказаний (MVP)
-
-На `/draw/<showId>` зритель получает только **public-config**. Текст/рисунок предсказания сервер отдаёт **только после `locked`** (через одноразовую session).
-
-Это не абсолютная криптографическая защита (зритель может перезагрузить страницу и попытаться запросить другое), но список предсказаний целиком в Network не прилетает.
-
-## Где расширять до полноценного 8-mode
-
-Сейчас надежная классификация реализована для 4 направлений. Для режима `mode=8` конфиг/данные поддерживают 8 предсказаний и `mapping8`, но классификатор пока использует graceful fallback.
-
-Точка расширения:
-- `src/hooks/useMotionClassifier.ts`
-- `src/types/config.ts` (`Mapping8`)
+1) Открой `/master`, введи `MASTER_TOKEN`, нажми **Generate links**.
+2) Отдай фокуснику ссылку **Magician admin (private)**.
+3) Фокусник на своей ссылке настроит предсказания/mapping → **Save to server**.
+4) Зрителю даёшь `/draw/:showId` — там подхватятся настройки.
