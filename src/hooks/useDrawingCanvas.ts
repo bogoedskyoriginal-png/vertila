@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 type Point = { x: number; y: number };
@@ -26,6 +26,43 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  const exportDataUrl = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    try {
+      return canvas.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const loadFromDataUrl = useCallback(async (dataUrl: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const img = new Image();
+    img.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("image load failed"));
+      img.src = dataUrl;
+    }).catch(() => undefined);
+
+    if (!img.width || !img.height) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Простое масштабирование "вписать" по canvas.
+    const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    const x = (canvas.width - w) / 2;
+    const y = (canvas.height - h) / 2;
+    ctx.drawImage(img, x, y, w, h);
   }, []);
 
   const setSizePreservingContent = useCallback(
@@ -139,6 +176,8 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
   return {
     canvasRef,
     clear,
+    exportDataUrl,
+    loadFromDataUrl,
     bindPointerHandlers
   };
 }

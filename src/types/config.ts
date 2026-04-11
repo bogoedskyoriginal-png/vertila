@@ -1,4 +1,4 @@
-﻿export type AppMode = 4 | 8;
+export type AppMode = 4 | 8;
 
 export type Direction4 = "top" | "right" | "bottom" | "left";
 
@@ -8,6 +8,8 @@ export type PredictionItem = {
   id: PredictionId;
   label: string;
   text: string;
+  // Опциональный рисунок предсказания (data URL, хранится в localStorage).
+  imageDataUrl?: string;
 };
 
 export type Mapping4 = Record<Direction4, PredictionId>;

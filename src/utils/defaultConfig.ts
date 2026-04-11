@@ -1,4 +1,4 @@
-﻿import type { AppConfig, PredictionId } from "../types/config";
+import type { AppConfig, PredictionId } from "../types/config";
 
 function predictionLabel(id: PredictionId) {
   return `Prediction ${id}`;
@@ -10,7 +10,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   predictions: ([1, 2, 3, 4, 5, 6, 7, 8] as const).map((id) => ({
     id,
     label: predictionLabel(id),
-    text: id <= 4 ? `Заглушка ${id}` : ""
+    text: id <= 4 ? `Заглушка ${id}` : "",
+    imageDataUrl: ""
   })),
   mapping4: {
     top: 1,

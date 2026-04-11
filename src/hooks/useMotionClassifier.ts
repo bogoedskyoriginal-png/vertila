@@ -1,5 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppConfig, Direction4, PredictionId } from "../types/config";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { AppConfig, Direction4, PredictionId, PredictionItem } from "../types/config";
 import type { MotionFlowState, MotionSample } from "../types/motion";
 import { confidenceFromAverages, dominantDirection4, magnitude3, meanSample } from "../utils/motionMath";
 import { updateSpectatorHiddenState } from "../store/useSpectatorStateStore";
@@ -15,6 +15,7 @@ type HookResult = {
   classifiedDirection: Direction4 | null;
   classifiedResultIndex: PredictionId | null;
   selectedPredictionText: string | null;
+  selectedPredictionImageDataUrl: string | null;
   confidenceScore: number | null;
   experimentalNote: string | null;
   enableSensors: () => Promise<void>;
@@ -32,9 +33,8 @@ function isIossafariPermissionFlowSupported(): boolean {
   return typeof DME?.requestPermission === "function";
 }
 
-function pickPredictionText(config: AppConfig, id: PredictionId): string {
-  const item = config.predictions.find((p) => p.id === id);
-  return item?.text ?? "";
+function pickPrediction(config: AppConfig, id: PredictionId): PredictionItem | null {
+  return config.predictions.find((p) => p.id === id) ?? null;
 }
 
 export function useMotionClassifier(config: AppConfig): HookResult {
@@ -46,6 +46,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   const [classifiedDirection, setClassifiedDirection] = useState<Direction4 | null>(null);
   const [classifiedResultIndex, setClassifiedResultIndex] = useState<PredictionId | null>(null);
   const [selectedPredictionText, setSelectedPredictionText] = useState<string | null>(null);
+  const [selectedPredictionImageDataUrl, setSelectedPredictionImageDataUrl] = useState<string | null>(null);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
 
   const sensorAvailable = useMemo(() => {
@@ -94,27 +95,39 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       classifiedDirection: null,
       classifiedResultIndex: null,
       selectedPredictionText: null,
+      selectedPredictionImageDataUrl: null,
       confidenceScore: null,
       lockedAt: null
     }));
   }, []);
 
-  const lockResult = useCallback((direction: Direction4, resultIndex: PredictionId, predictionText: string, confidence: number) => {
-    lockedRef.current = true;
-    setClassifiedDirection(direction);
-    setClassifiedResultIndex(resultIndex);
-    setSelectedPredictionText(predictionText);
-    setConfidenceScore(confidence);
-    setAppState("locked");
+  const lockResult = useCallback(
+    (
+      direction: Direction4,
+      resultIndex: PredictionId,
+      predictionText: string | null,
+      predictionImage: string | null,
+      confidence: number
+    ) => {
+      lockedRef.current = true;
+      setClassifiedDirection(direction);
+      setClassifiedResultIndex(resultIndex);
+      setSelectedPredictionText(predictionText);
+      setSelectedPredictionImageDataUrl(predictionImage);
+      setConfidenceScore(confidence);
+      setAppState("locked");
 
-    updateSpectatorHiddenState(() => ({
-      classifiedDirection: direction,
-      classifiedResultIndex: resultIndex,
-      selectedPredictionText: predictionText,
-      confidenceScore: confidence,
-      lockedAt: Date.now()
-    }));
-  }, []);
+      updateSpectatorHiddenState(() => ({
+        classifiedDirection: direction,
+        classifiedResultIndex: resultIndex,
+        selectedPredictionText: predictionText,
+        selectedPredictionImageDataUrl: predictionImage,
+        confidenceScore: confidence,
+        lockedAt: Date.now()
+      }));
+    },
+    []
+  );
 
   const classifyWindow = useCallback(() => {
     if (lockedRef.current) return;
@@ -148,10 +161,12 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     // MVP: надежная классификация только для 4 исходов.
     // mode=8 сейчас использует graceful fallback на mapping4/predictions.
     const predictionId = configNow.mapping4[direction];
-    const predictionText = pickPredictionText(configNow, predictionId);
+    const item = pickPrediction(configNow, predictionId);
+    const predictionText = item?.text?.trim() ? item.text : null;
+    const predictionImage = item?.imageDataUrl?.trim() ? item.imageDataUrl : null;
 
     setAppState("classified");
-    lockResult(direction, predictionId, predictionText, confidence);
+    lockResult(direction, predictionId, predictionText, predictionImage, confidence);
   }, [lockResult]);
 
   const startDetectionWindow = useCallback(() => {
@@ -329,6 +344,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     setClassifiedDirection(null);
     setClassifiedResultIndex(null);
     setSelectedPredictionText(null);
+    setSelectedPredictionImageDataUrl(null);
     setConfidenceScore(null);
 
     baselineRef.current = null;
@@ -347,7 +363,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     };
   }, [clearTimers, detachListener]);
 
-  const experimentalNote = config.mode === 8 ? "mode=8: experimental placeholder (сейчас используется 4-direction fallback)" : null;
+  const experimentalNote =
+    config.mode === 8 ? "mode=8: experimental placeholder (сейчас используется 4-direction fallback)" : null;
 
   return {
     appState,
@@ -358,6 +375,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     classifiedDirection,
     classifiedResultIndex,
     selectedPredictionText,
+    selectedPredictionImageDataUrl,
     confidenceScore,
     experimentalNote,
     enableSensors,

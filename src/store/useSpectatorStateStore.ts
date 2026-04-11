@@ -1,10 +1,11 @@
-﻿import type { SpectatorHiddenState } from "../types/motion";
+import type { SpectatorHiddenState } from "../types/motion";
 import { createSimpleStore, useSimpleStore } from "./simpleStore";
 
 const EMPTY_STATE: SpectatorHiddenState = {
   classifiedDirection: null,
   classifiedResultIndex: null,
   selectedPredictionText: null,
+  selectedPredictionImageDataUrl: null,
   confidenceScore: null,
   lockedAt: null
 };

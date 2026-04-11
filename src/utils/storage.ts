@@ -1,4 +1,4 @@
-﻿import type { AppConfig } from "../types/config";
+import type { AppConfig } from "../types/config";
 import { DEFAULT_CONFIG } from "./defaultConfig";
 
 const STORAGE_KEY = "magic-draw-config-v1";
@@ -34,7 +34,11 @@ function mergeWithDefaults(config: AppConfig): AppConfig {
   };
 
   const byId = new Map(merged.predictions.map((p) => [p.id, p]));
-  merged.predictions = DEFAULT_CONFIG.predictions.map((p) => byId.get(p.id) ?? p);
+  merged.predictions = DEFAULT_CONFIG.predictions.map((p) => ({
+    ...p,
+    ...(byId.get(p.id) ?? {})
+  }));
+
   return merged;
 }
 

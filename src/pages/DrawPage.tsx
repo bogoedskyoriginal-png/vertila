@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { DrawingCanvas } from "../components/DrawingCanvas";
 import { Toolbar } from "../components/Toolbar";
 import { CountdownOverlay } from "../components/CountdownOverlay";
@@ -116,10 +116,12 @@ export function DrawPage() {
             <div>
               selectedPredictionText: <span className="kbd">{String(hidden.selectedPredictionText)}</span>
             </div>
+            <div>
+              selectedPredictionImage: <span className="kbd">{hidden.selectedPredictionImageDataUrl ? "yes" : "no"}</span>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
-
