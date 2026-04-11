@@ -1,7 +1,9 @@
 import type { AppConfig } from "./config";
 
 export type CreateShowResponse = {
-  showCode: string;
+  showCode?: string;
+  // backward-compat (older deployments)
+  showId?: string;
   adminKey: string;
 };
 

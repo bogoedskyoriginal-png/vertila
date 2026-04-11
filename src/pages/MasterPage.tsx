@@ -35,11 +35,12 @@ export function MasterPage() {
   const links = useMemo(() => {
     if (!created) return null;
     const base = window.location.origin;
+        const code = (created.showCode ?? created.showId ?? "").toString();
     return {
-      showCode: created.showCode,
+      showCode: code,
       adminKey: created.adminKey,
-      magicianAdmin: `${base}/${encodeURIComponent(created.showCode)}/admin`,
-      spectator: `${base}/${encodeURIComponent(created.showCode)}`
+      magicianAdmin: `${base}/${encodeURIComponent(code)}/admin`,
+      spectator: `${base}/${encodeURIComponent(code)}`
     };
   }, [created]);
 

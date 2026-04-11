@@ -92,7 +92,7 @@ app.post("/api/master/shows", async (req, res) => {
     updatedAt: Date.now()
   });
 
-  res.json({ showCode: code, adminKey });
+  res.json({ showCode: code, showId: code, adminKey });
 });
 
 app.get("/api/shows/:code/config", async (req, res) => {
