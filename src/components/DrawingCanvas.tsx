@@ -1,32 +1,61 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
+import type { DrawingTool } from "../hooks/useDrawingCanvas";
+
+export type DrawingCanvasApi = {
+  clear: () => void;
+  exportDataUrl: () => string | null;
+  drawFromDataUrl: (dataUrl: string, opts?: { clear?: boolean }) => Promise<void>;
+};
 
 type Props = {
   color: string;
+  tool: DrawingTool;
   lineWidth?: number;
-  onReady?: (api: { clear: () => void }) => void;
+  eraserWidth?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  onReady?: (api: DrawingCanvasApi) => void;
+  onStrokeEnd?: () => void;
 };
 
-export function DrawingCanvas({ color, lineWidth, onReady }: Props) {
-  const { canvasRef, bindPointerHandlers, clear } = useDrawingCanvas({ color, lineWidth });
+export function DrawingCanvas({
+  color,
+  tool,
+  lineWidth,
+  eraserWidth,
+  className,
+  style,
+  onReady,
+  onStrokeEnd
+}: Props) {
+  const { canvasRef, bindPointerHandlers, clear, exportDataUrl, drawFromDataUrl } = useDrawingCanvas({
+    color,
+    tool,
+    lineWidth,
+    eraserWidth
+  });
 
   useEffect(() => {
-    onReady?.({ clear });
-  }, [clear, onReady]);
+    onReady?.({ clear, exportDataUrl, drawFromDataUrl });
+  }, [clear, drawFromDataUrl, exportDataUrl, onReady]);
 
   return (
     <div
-      className="card"
+      className={className ?? "card"}
       style={{
         width: "100%",
         height: "calc(100vh - 24px - 64px)",
         overflow: "hidden",
-        touchAction: "none"
+        touchAction: "none",
+        ...(style ?? {})
       }}
     >
       <canvas
         ref={canvasRef}
         {...bindPointerHandlers}
+        onPointerUp={() => onStrokeEnd?.()}
+        onPointerCancel={() => onStrokeEnd?.()}
         style={{
           display: "block",
           width: "100%",
@@ -37,3 +66,4 @@ export function DrawingCanvas({ color, lineWidth, onReady }: Props) {
     </div>
   );
 }
+

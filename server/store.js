@@ -30,76 +30,48 @@ export function createStore(opts = {}) {
   const state =
     readJson(filePath) ||
     ({
-      shows: {},
-      sessions: {}
+      users: {}
     });
 
   function persist() {
     writeJsonAtomic(filePath, state);
   }
 
-  function getShow(id) {
-    return state.shows[id] || null;
+  function getUser(code) {
+    return state.users[code] || null;
   }
 
-  function setShow(id, show) {
-    state.shows[id] = show;
+  function setUser(code, user) {
+    state.users[code] = user;
     persist();
   }
 
-  function updateShow(id, updater) {
-    const prev = getShow(id);
+  function updateUser(code, updater) {
+    const prev = getUser(code);
     if (!prev) return null;
     const next = updater(prev);
-    state.shows[id] = next;
+    state.users[code] = next;
     persist();
     return next;
   }
 
-  function createSession(showId, sessionId) {
-    const key = `${showId}:${sessionId}`;
-    state.sessions[key] = { used: false, createdAt: Date.now() };
-    persist();
+  function listUsers() {
+    return Object.values(state.users);
   }
 
-  function getSession(showId, sessionId) {
-    const key = `${showId}:${sessionId}`;
-    return state.sessions[key] || null;
-  }
-
-  function markSessionUsed(showId, sessionId, resultIndex) {
-    const key = `${showId}:${sessionId}`;
-    const s = state.sessions[key];
-    if (!s) return false;
-    s.used = true;
-    s.usedAt = Date.now();
-    s.resultIndex = resultIndex;
+  function deleteUser(code) {
+    if (!state.users[code]) return false;
+    delete state.users[code];
     persist();
     return true;
   }
 
-  function cleanupSessions(maxAgeMs = 20 * 60 * 1000) {
-    const now = Date.now();
-    let changed = false;
-    for (const key of Object.keys(state.sessions)) {
-      const s = state.sessions[key];
-      const createdAt = Number(s?.createdAt || 0);
-      if (!createdAt || now - createdAt > maxAgeMs) {
-        delete state.sessions[key];
-        changed = true;
-      }
-    }
-    if (changed) persist();
-  }
-
   return {
     filePath,
-    getShow,
-    setShow,
-    updateShow,
-    createSession,
-    getSession,
-    markSessionUsed,
-    cleanupSessions
+    getUser,
+    setUser,
+    updateUser,
+    listUsers,
+    deleteUser
   };
 }

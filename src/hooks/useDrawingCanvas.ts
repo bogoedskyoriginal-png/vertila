@@ -3,9 +3,13 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 
 type Point = { x: number; y: number };
 
+export type DrawingTool = "pen" | "eraser";
+
 type Options = {
   color: string;
+  tool?: DrawingTool;
   lineWidth?: number;
+  eraserWidth?: number;
 };
 
 function getCanvasPoint(canvas: HTMLCanvasElement, clientX: number, clientY: number): Point {
@@ -15,16 +19,35 @@ function getCanvasPoint(canvas: HTMLCanvasElement, clientX: number, clientY: num
   return { x, y };
 }
 
-export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
+export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWidth = 18 }: Options) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
+
+  const applyStrokeStyle = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      if (tool === "eraser") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+        ctx.lineWidth = eraserWidth;
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+      }
+    },
+    [color, eraserWidth, lineWidth, tool]
+  );
 
   const clear = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
@@ -38,7 +61,7 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
     }
   }, []);
 
-  const loadFromDataUrl = useCallback(async (dataUrl: string) => {
+  const drawFromDataUrl = useCallback(async (dataUrl: string, opts?: { clear?: boolean }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -54,48 +77,49 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
 
     if (!img.width || !img.height) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (opts?.clear !== false) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 
-    // Простое масштабирование "вписать" по canvas.
     const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
     const w = img.width * scale;
     const h = img.height * scale;
     const x = (canvas.width - w) / 2;
     const y = (canvas.height - h) / 2;
+
+    ctx.globalCompositeOperation = "source-over";
     ctx.drawImage(img, x, y, w, h);
   }, []);
 
-  const setSizePreservingContent = useCallback(
-    (width: number, height: number) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+  const setSizePreservingContent = useCallback((width: number, height: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-      const prev = document.createElement("canvas");
-      prev.width = canvas.width;
-      prev.height = canvas.height;
-      const prevCtx = prev.getContext("2d");
-      if (prevCtx) prevCtx.drawImage(canvas, 0, 0);
+    const prev = document.createElement("canvas");
+    prev.width = canvas.width;
+    prev.height = canvas.height;
+    const prevCtx = prev.getContext("2d");
+    if (prevCtx) prevCtx.drawImage(canvas, 0, 0);
 
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.max(1, Math.floor(width * dpr));
-      canvas.height = Math.max(1, Math.floor(height * dpr));
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.floor(width * dpr));
+    canvas.height = Math.max(1, Math.floor(height * dpr));
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
 
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-      if (prev.width > 0 && prev.height > 0) {
-        ctx.drawImage(prev, 0, 0, prev.width, prev.height, 0, 0, canvas.width, canvas.height);
-      }
-    },
-    [color, lineWidth]
-  );
+    if (prev.width > 0 && prev.height > 0) {
+      ctx.drawImage(prev, 0, 0, prev.width, prev.height, 0, 0, canvas.width, canvas.height);
+    }
+  }, []);
 
   const start = useCallback(
     (clientX: number, clientY: number) => {
@@ -104,11 +128,10 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       isDrawingRef.current = true;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
+      applyStrokeStyle(ctx);
       lastPointRef.current = getCanvasPoint(canvas, clientX, clientY);
     },
-    [color, lineWidth]
+    [applyStrokeStyle]
   );
 
   const move = useCallback(
@@ -125,16 +148,14 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
         return;
       }
 
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-
+      applyStrokeStyle(ctx);
       ctx.beginPath();
       ctx.moveTo(last.x, last.y);
       ctx.lineTo(next.x, next.y);
       ctx.stroke();
       lastPointRef.current = next;
     },
-    [color, lineWidth]
+    [applyStrokeStyle]
   );
 
   const end = useCallback(() => {
@@ -177,7 +198,8 @@ export function useDrawingCanvas({ color, lineWidth = 5 }: Options) {
     canvasRef,
     clear,
     exportDataUrl,
-    loadFromDataUrl,
+    drawFromDataUrl,
     bindPointerHandlers
   };
 }
+

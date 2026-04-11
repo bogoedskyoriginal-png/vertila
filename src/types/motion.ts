@@ -1,22 +1,18 @@
-import type { Direction4, PredictionId } from "./config";
+import type { Direction4, FlipSpeed, PredictionId } from "./config";
 
 export type MotionFlowState =
   | "idle"
   | "requestingPermission"
-  | "countdown"
   | "calibrating"
   | "armed"
-  | "motionDetected"
-  | "classified"
+  | "detecting"
   | "locked";
 
-export type SpectatorHiddenState = {
-  classifiedDirection: Direction4 | null;
-  classifiedResultIndex: PredictionId | null;
-  selectedPredictionText: string | null;
-  selectedPredictionImageDataUrl: string | null;
-  confidenceScore: number | null;
-  lockedAt: number | null;
+export type FlipResult = {
+  side: Direction4;
+  speed: FlipSpeed;
+  durationMs: number;
+  predictionId: PredictionId;
 };
 
 export type MotionSample = {
@@ -25,3 +21,4 @@ export type MotionSample = {
   y: number;
   z: number;
 };
+

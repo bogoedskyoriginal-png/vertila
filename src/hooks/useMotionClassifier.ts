@@ -1,26 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppConfig, Direction4, PredictionId, PredictionItem } from "../types/config";
-import type { MotionFlowState, MotionSample } from "../types/motion";
-import { confidenceFromAverages, dominantDirection4, magnitude3, meanSample } from "../utils/motionMath";
-import { updateSpectatorHiddenState } from "../store/useSpectatorStateStore";
+import type { AppConfig, Direction4, FlipSpeed, PredictionId } from "../types/config";
+import type { FlipResult, MotionFlowState, MotionSample } from "../types/motion";
+import { dominantDirection4, magnitude3, meanSample } from "../utils/motionMath";
 
 type Baseline = { x: number; y: number; z: number };
 
 type HookResult = {
-  appState: MotionFlowState;
-  countdownValue: number;
+  state: MotionFlowState;
   sensorAvailable: boolean;
   permissionGranted: boolean;
   permissionError: string | null;
-  classifiedDirection: Direction4 | null;
-  classifiedResultIndex: PredictionId | null;
-  selectedPredictionText: string | null;
-  selectedPredictionImageDataUrl: string | null;
-  confidenceScore: number | null;
-  experimentalNote: string | null;
-  enableSensors: () => Promise<void>;
-  startArming: () => void;
-  resetClassifier: () => void;
+  result: FlipResult | null;
+  arm: () => Promise<void>;
+  reset: () => void;
 };
 
 function nowMs() {
@@ -33,266 +25,159 @@ function isIossafariPermissionFlowSupported(): boolean {
   return typeof DME?.requestPermission === "function";
 }
 
-function pickPrediction(config: AppConfig, id: PredictionId): PredictionItem | null {
-  return config.predictions.find((p) => p.id === id) ?? null;
+function predictionIdFor(side: Direction4, speed: FlipSpeed, mode: 4 | 8): PredictionId {
+  if (mode === 4) {
+    return (side === "top" ? 1 : side === "right" ? 2 : side === "bottom" ? 3 : 4) as PredictionId;
+  }
+  const base = side === "top" ? 1 : side === "right" ? 2 : side === "bottom" ? 3 : 4;
+  return (speed === "fast" ? base + 4 : base) as PredictionId;
 }
 
 export function useMotionClassifier(config: AppConfig): HookResult {
-  const [appState, setAppState] = useState<MotionFlowState>("idle");
-  const [countdownValue, setCountdownValue] = useState<number>(0);
-  const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
+  const [state, setState] = useState<MotionFlowState>("idle");
+  const [permissionGranted, setPermissionGranted] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-
-  const [classifiedDirection, setClassifiedDirection] = useState<Direction4 | null>(null);
-  const [classifiedResultIndex, setClassifiedResultIndex] = useState<PredictionId | null>(null);
-  const [selectedPredictionText, setSelectedPredictionText] = useState<string | null>(null);
-  const [selectedPredictionImageDataUrl, setSelectedPredictionImageDataUrl] = useState<string | null>(null);
-  const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
+  const [result, setResult] = useState<FlipResult | null>(null);
 
   const sensorAvailable = useMemo(() => {
     return typeof window !== "undefined" && "DeviceMotionEvent" in window;
   }, []);
 
   const configRef = useRef<AppConfig>(config);
-  const appStateRef = useRef<MotionFlowState>(appState);
-  const permissionGrantedRef = useRef<boolean>(permissionGranted);
-
   useEffect(() => {
     configRef.current = config;
   }, [config]);
 
-  useEffect(() => {
-    appStateRef.current = appState;
-  }, [appState]);
-
-  useEffect(() => {
-    permissionGrantedRef.current = permissionGranted;
-  }, [permissionGranted]);
-
   const baselineRef = useRef<Baseline | null>(null);
-  const calibrationSamplesRef = useRef<MotionSample[]>([]);
-  const detectionSamplesRef = useRef<MotionSample[]>([]);
-  const peakMagnitudeRef = useRef<number>(0);
+  const samplesRef = useRef<MotionSample[]>([]);
 
-  const countdownTimerRef = useRef<number | null>(null);
-  const calibrateTimerRef = useRef<number | null>(null);
-  const detectionTimerRef = useRef<number | null>(null);
+  const armedAtRef = useRef<number>(0);
+  const calibrationCollectAfterRef = useRef<number>(0);
+  const motionStartRef = useRef<number | null>(null);
+  const motionEndCandidateRef = useRef<number | null>(null);
+  const peakDeltaRef = useRef<number>(0);
 
   const listenerAttachedRef = useRef(false);
   const lockedRef = useRef(false);
 
-  const clearTimers = useCallback(() => {
-    if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
-    if (calibrateTimerRef.current) window.clearTimeout(calibrateTimerRef.current);
-    if (detectionTimerRef.current) window.clearTimeout(detectionTimerRef.current);
-    countdownTimerRef.current = null;
-    calibrateTimerRef.current = null;
-    detectionTimerRef.current = null;
-  }, []);
+  // stateRef is used inside the motion handler without re-attaching the listener.
+  const stateRef = useRef<MotionFlowState>(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
-  const resetHiddenState = useCallback(() => {
-    updateSpectatorHiddenState(() => ({
-      classifiedDirection: null,
-      classifiedResultIndex: null,
-      selectedPredictionText: null,
-      selectedPredictionImageDataUrl: null,
-      confidenceScore: null,
-      lockedAt: null
-    }));
-  }, []);
-
-  const lockResult = useCallback(
-    (
-      direction: Direction4,
-      resultIndex: PredictionId,
-      predictionText: string | null,
-      predictionImage: string | null,
-      confidence: number
-    ) => {
-      lockedRef.current = true;
-      setClassifiedDirection(direction);
-      setClassifiedResultIndex(resultIndex);
-      setSelectedPredictionText(predictionText);
-      setSelectedPredictionImageDataUrl(predictionImage);
-      setConfidenceScore(confidence);
-      setAppState("locked");
-
-      updateSpectatorHiddenState(() => ({
-        classifiedDirection: direction,
-        classifiedResultIndex: resultIndex,
-        selectedPredictionText: predictionText,
-        selectedPredictionImageDataUrl: predictionImage,
-        confidenceScore: confidence,
-        lockedAt: Date.now()
-      }));
-    },
-    []
-  );
-
-  const classifyWindow = useCallback(() => {
-    if (lockedRef.current) return;
-    const baseline = baselineRef.current;
-    if (!baseline) {
-      setAppState("armed");
-      return;
-    }
-
-    const configNow = configRef.current;
-    const samples = detectionSamplesRef.current;
-    if (samples.length < 5) {
-      setAppState("armed");
-      return;
-    }
-
-    const avg = meanSample(samples);
-    const dxAvg = avg.x - baseline.x;
-    const dyAvg = avg.y - baseline.y;
-
-    const direction = dominantDirection4(dxAvg, dyAvg);
-    const confidence = confidenceFromAverages(dxAvg, dyAvg, peakMagnitudeRef.current, configNow.motion.motionThreshold);
-
-    if (confidence < configNow.motion.confidenceThreshold) {
-      setAppState("armed");
-      detectionSamplesRef.current = [];
-      peakMagnitudeRef.current = 0;
-      return;
-    }
-
-    // MVP: надежная классификация только для 4 исходов.
-    // mode=8 сейчас использует graceful fallback на mapping4/predictions.
-    const predictionId = configNow.mapping4[direction];
-    const item = pickPrediction(configNow, predictionId);
-    const predictionText = item?.text?.trim() ? item.text : null;
-    const predictionImage = item?.imageDataUrl?.trim() ? item.imageDataUrl : null;
-
-    setAppState("classified");
-    lockResult(direction, predictionId, predictionText, predictionImage, confidence);
-  }, [lockResult]);
-
-  const startDetectionWindow = useCallback(() => {
-    setAppState("motionDetected");
-    detectionSamplesRef.current = [];
-    peakMagnitudeRef.current = 0;
-
-    if (detectionTimerRef.current) window.clearTimeout(detectionTimerRef.current);
-    detectionTimerRef.current = window.setTimeout(() => classifyWindow(), 260);
-  }, [classifyWindow]);
-
-  const onMotion = useCallback(
+  const handler = useCallback(
     (e: DeviceMotionEvent) => {
       if (lockedRef.current) return;
+      const st = stateRef.current;
+      if (st !== "calibrating" && st !== "armed" && st !== "detecting") return;
 
-      const acc = e.accelerationIncludingGravity;
-      if (!acc) return;
+      const a = e.accelerationIncludingGravity;
+      if (!a) return;
 
-      const x = acc.x ?? 0;
-      const y = acc.y ?? 0;
-      const z = acc.z ?? 0;
+      const x = Number(a.x || 0);
+      const y = Number(a.y || 0);
+      const z = Number(a.z || 0);
       const t = nowMs();
-      const sample: MotionSample = { t, x, y, z };
 
-      const stateNow = appStateRef.current;
-      const configNow = configRef.current;
-
-      if (stateNow === "calibrating") {
-        calibrationSamplesRef.current.push(sample);
+      if (st === "calibrating") {
+        if (t < calibrationCollectAfterRef.current) return;
+        samplesRef.current.push({ t, x, y, z });
         return;
       }
 
       const baseline = baselineRef.current;
       if (!baseline) return;
-
       const dx = x - baseline.x;
       const dy = y - baseline.y;
       const dz = z - baseline.z;
-      const mag = magnitude3(dx, dy, dz);
+      const delta = magnitude3(dx, dy, dz);
 
-      if (stateNow === "armed") {
-        if (mag >= configNow.motion.motionThreshold) {
-          startDetectionWindow();
-          detectionSamplesRef.current.push(sample);
-          peakMagnitudeRef.current = Math.max(peakMagnitudeRef.current, mag);
+      const { motionThreshold } = configRef.current.motion;
+
+      if (st === "armed") {
+        if (delta >= motionThreshold) {
+          motionStartRef.current = t;
+          motionEndCandidateRef.current = null;
+          peakDeltaRef.current = delta;
+          samplesRef.current = [{ t, x, y, z }];
+          setState("detecting");
         }
         return;
       }
 
-      if (stateNow === "motionDetected") {
-        detectionSamplesRef.current.push(sample);
-        peakMagnitudeRef.current = Math.max(peakMagnitudeRef.current, mag);
+      if (st === "detecting") {
+        samplesRef.current.push({ t, x, y, z });
+        peakDeltaRef.current = Math.max(peakDeltaRef.current, delta);
+
+        const quietThreshold = motionThreshold * 0.6;
+        if (delta < quietThreshold) {
+          if (!motionEndCandidateRef.current) motionEndCandidateRef.current = t;
+        } else {
+          motionEndCandidateRef.current = null;
+        }
+
+        const startedAt = motionStartRef.current ?? t;
+        const endCandidateAt = motionEndCandidateRef.current;
+        const quietLongEnough = endCandidateAt ? t - endCandidateAt >= 120 : false;
+        const maxWindowReached = t - startedAt >= 1200;
+
+        if (!quietLongEnough && !maxWindowReached) return;
+
+        const durationMs = Math.max(1, Math.round(t - startedAt));
+        const mean = meanSample(samplesRef.current);
+        const dxAvg = mean.x - baseline.x;
+        const dyAvg = mean.y - baseline.y;
+
+        const side = dominantDirection4(dxAvg, dyAvg);
+        const fastFlipMs = Math.max(50, Number(configRef.current.motion.fastFlipMs || 350));
+        const speed: FlipSpeed = durationMs <= fastFlipMs ? "fast" : "slow";
+        const predictionId = predictionIdFor(side, speed, configRef.current.mode);
+
+        lockedRef.current = true;
+        setState("locked");
+        setResult({ side, speed, durationMs, predictionId });
       }
     },
-    [startDetectionWindow]
+    []
   );
 
-  const attachListener = useCallback(() => {
+  const attach = useCallback(() => {
     if (listenerAttachedRef.current) return;
-    window.addEventListener("devicemotion", onMotion as EventListener, { passive: true });
     listenerAttachedRef.current = true;
-  }, [onMotion]);
+    window.addEventListener("devicemotion", handler, { passive: true });
+  }, [handler]);
 
-  const detachListener = useCallback(() => {
+  const detach = useCallback(() => {
     if (!listenerAttachedRef.current) return;
-    window.removeEventListener("devicemotion", onMotion as EventListener);
     listenerAttachedRef.current = false;
-  }, [onMotion]);
+    window.removeEventListener("devicemotion", handler);
+  }, [handler]);
 
-  const startCalibration = useCallback(() => {
-    if (lockedRef.current) return;
-
-    setAppState("calibrating");
-    calibrationSamplesRef.current = [];
+  const calibrate = useCallback(() => {
+    samplesRef.current = [];
     baselineRef.current = null;
+    lockedRef.current = false;
+    setResult(null);
 
-    const configNow = configRef.current;
-    const duration = Math.max(200, configNow.motion.calibrationMs);
+    setState("calibrating");
+    const calibrationMs = Math.max(150, Number(configRef.current.motion.calibrationMs || 350));
+    armedAtRef.current = nowMs();
+    // Give a short "settle" window so the magician can put the phone face-down right after the double tap.
+    calibrationCollectAfterRef.current = armedAtRef.current + 650;
 
-    if (calibrateTimerRef.current) window.clearTimeout(calibrateTimerRef.current);
-    calibrateTimerRef.current = window.setTimeout(() => {
-      const samples = calibrationSamplesRef.current;
-      baselineRef.current = meanSample(samples);
-      setAppState("armed");
-    }, duration);
+    window.setTimeout(() => {
+      const base = meanSample(samplesRef.current);
+      baselineRef.current = base;
+      samplesRef.current = [];
+      motionStartRef.current = null;
+      motionEndCandidateRef.current = null;
+      peakDeltaRef.current = 0;
+      setState("armed");
+    }, 650 + calibrationMs);
   }, []);
 
-  const startCountdown = useCallback(() => {
-    if (lockedRef.current) return;
-
-    clearTimers();
-    setPermissionError(null);
-    setAppState("countdown");
-
-    const configNow = configRef.current;
-    const total = Math.max(1, Math.floor(configNow.motion.countdownSeconds));
-    setCountdownValue(total);
-
-    countdownTimerRef.current = window.setInterval(() => {
-      setCountdownValue((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          clearTimers();
-          startCalibration();
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-  }, [clearTimers, startCalibration]);
-
-  const startArming = useCallback(() => {
-    if (!sensorAvailable) {
-      setPermissionError("Датчики движения недоступны на этом устройстве/в этом браузере.");
-      return;
-    }
-    if (!permissionGrantedRef.current) {
-      setPermissionError("Сначала разрешите доступ к датчикам (кнопка включения).");
-      return;
-    }
-
-    attachListener();
-    startCountdown();
-  }, [attachListener, sensorAvailable, startCountdown]);
-
-  const enableSensors = useCallback(async () => {
+  const arm = useCallback(async () => {
     setPermissionError(null);
 
     if (!sensorAvailable) {
@@ -303,83 +188,56 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     if (lockedRef.current) return;
 
     if (isIossafariPermissionFlowSupported()) {
-      setAppState("requestingPermission");
+      setState("requestingPermission");
       try {
         const w = window as unknown as {
           DeviceMotionEvent?: { requestPermission?: () => Promise<"granted" | "denied"> };
         };
         const res = await w.DeviceMotionEvent!.requestPermission!();
         if (res !== "granted") {
-          setAppState("idle");
+          setState("idle");
           setPermissionGranted(false);
-          permissionGrantedRef.current = false;
-          setPermissionError("Доступ к датчикам не разрешен. Проверьте настройки Safari и попробуйте снова.");
+          setPermissionError("Доступ к датчикам не разрешён.");
           return;
         }
       } catch {
-        setAppState("idle");
+        setState("idle");
         setPermissionGranted(false);
-        permissionGrantedRef.current = false;
-        setPermissionError("Не удалось запросить разрешение на датчики. Попробуйте снова.");
+        setPermissionError("Не удалось запросить разрешение на датчики.");
         return;
       }
     }
 
     setPermissionGranted(true);
-    permissionGrantedRef.current = true;
+    attach();
+    calibrate();
+  }, [attach, calibrate, sensorAvailable]);
 
-    // В MVP включение датчиков сразу запускает sequence.
-    attachListener();
-    startCountdown();
-  }, [attachListener, sensorAvailable, startCountdown]);
-
-  const resetClassifier = useCallback(() => {
-    clearTimers();
-    detachListener();
-
-    setAppState("idle");
-    setCountdownValue(0);
+  const reset = useCallback(() => {
     setPermissionError(null);
-
-    setClassifiedDirection(null);
-    setClassifiedResultIndex(null);
-    setSelectedPredictionText(null);
-    setSelectedPredictionImageDataUrl(null);
-    setConfidenceScore(null);
-
+    setResult(null);
     baselineRef.current = null;
-    calibrationSamplesRef.current = [];
-    detectionSamplesRef.current = [];
-    peakMagnitudeRef.current = 0;
+    samplesRef.current = [];
+    motionStartRef.current = null;
+    motionEndCandidateRef.current = null;
+    peakDeltaRef.current = 0;
     lockedRef.current = false;
-
-    resetHiddenState();
-  }, [clearTimers, detachListener, resetHiddenState]);
+    setState("idle");
+  }, []);
 
   useEffect(() => {
     return () => {
-      clearTimers();
-      detachListener();
+      detach();
     };
-  }, [clearTimers, detachListener]);
-
-  const experimentalNote =
-    config.mode === 8 ? "mode=8: experimental placeholder (сейчас используется 4-direction fallback)" : null;
+  }, [detach]);
 
   return {
-    appState,
-    countdownValue,
+    state,
     sensorAvailable,
     permissionGranted,
     permissionError,
-    classifiedDirection,
-    classifiedResultIndex,
-    selectedPredictionText,
-    selectedPredictionImageDataUrl,
-    confidenceScore,
-    experimentalNote,
-    enableSensors,
-    startArming,
-    resetClassifier
+    result,
+    arm,
+    reset
   };
 }

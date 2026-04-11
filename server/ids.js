@@ -2,21 +2,13 @@ import crypto from "node:crypto";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 chars, no O/0/I/1
 
-export function makeShowCode(len = 5) {
+export function makeUserCode(len = 5) {
   const bytes = crypto.randomBytes(len);
   let out = "";
   for (let i = 0; i < len; i++) {
     out += ALPHABET[bytes[i] % ALPHABET.length];
   }
   return out;
-}
-
-export function makeAdminKey() {
-  return crypto.randomUUID();
-}
-
-export function makeSessionId() {
-  return crypto.randomUUID();
 }
 
 export function safeEqual(a, b) {

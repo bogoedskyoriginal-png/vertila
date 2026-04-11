@@ -13,18 +13,18 @@ export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function apiSend<T>(
   path: string,
-  method: "POST" | "PUT",
-  body: unknown,
+  method: "POST" | "PUT" | "DELETE",
+  body?: unknown,
   headers?: Record<string, string>
 ) {
   const res = await fetch(path, {
     method,
     headers: {
-      "Content-Type": "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       Accept: "application/json",
       ...(headers ?? {})
     },
-    body: JSON.stringify(body)
+    ...(body === undefined ? {} : { body: JSON.stringify(body) })
   });
   if (!res.ok) {
     let msg = `API ${res.status}`;

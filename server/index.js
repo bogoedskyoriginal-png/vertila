@@ -2,7 +2,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { makeAdminKey, makeSessionId, makeShowCode, safeEqual } from "./ids.js";
+import { makeUserCode, safeEqual } from "./ids.js";
 import { isValidConfig } from "./validate.js";
 import { DEFAULT_CONFIG } from "./defaultConfig.js";
 import { createStore } from "./store.js";
@@ -12,11 +12,22 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "20mb" }));
 
 const store = createStore({
   filePath: process.env.STORE_PATH
 });
+
+function normalizeCode(code) {
+  return String(code || "").trim().toUpperCase();
+}
+
+function isValidCode(code) {
+  if (!code) return false;
+  if (code.length !== 5) return false;
+  // a-z, 0-9 only (case-insensitive)
+  return /^[A-Z0-9]{5}$/.test(code);
+}
 
 function requireMaster(req, res) {
   const user = process.env.MASTER_USER || "master";
@@ -53,134 +64,132 @@ function requireMaster(req, res) {
   return true;
 }
 
-function publicConfig(config) {
+function normalizeConfig(input) {
+  if (!isValidConfig(input)) return DEFAULT_CONFIG;
+
+  // v1 -> v2 migration (keep mode, keep any saved images)
+  if (input.version === 1) {
+    const byId = new Map();
+    for (const p of input.predictions || []) byId.set(Number(p.id), p);
+
+    return {
+      version: 2,
+      mode: input.mode === 8 ? 8 : 4,
+      predictions: DEFAULT_CONFIG.predictions.map((base) => {
+        const prev = byId.get(base.id);
+        return {
+          id: base.id,
+          label: base.label,
+          imageDataUrl: String(prev?.imageDataUrl || "")
+        };
+      }),
+      motion: {
+        calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
+        motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
+        fastFlipMs: Number(DEFAULT_CONFIG.motion.fastFlipMs)
+      }
+    };
+  }
+
+  // v2: lightly normalize fields
+  const mode = input.mode === 8 ? 8 : 4;
+  const preds = Array.isArray(input.predictions) ? input.predictions : [];
+  const byId = new Map();
+  for (const p of preds) byId.set(Number(p?.id), p);
+
   return {
-    ...config,
-    predictions: (config.predictions || []).map((p) => ({ id: p.id, label: p.label }))
+    version: 2,
+    mode,
+    predictions: DEFAULT_CONFIG.predictions.map((base) => {
+      const prev = byId.get(base.id);
+      return {
+        id: base.id,
+        label: base.label,
+        imageDataUrl: String(prev?.imageDataUrl || "")
+      };
+    }),
+    motion: {
+      calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
+      motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
+      fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs)
+    }
   };
 }
 
 app.get("/api/health", async (_req, res) => {
-  res.json({ ok: true, storePath: store.filePath });
+  res.json({ ok: true, storePath: store.filePath, usersCount: store.listUsers().length });
 });
 
-// Master: create show
-app.post("/api/master/shows", async (req, res) => {
+// Master: list users
+app.get("/api/master/users", async (req, res) => {
+  if (!requireMaster(req, res)) return;
+  const users = store
+    .listUsers()
+    .map((u) => ({ code: u.code, createdAt: u.createdAt, updatedAt: u.updatedAt }))
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+  res.json({ users });
+});
+
+// Master: create user (by code or random)
+app.post("/api/master/users", async (req, res) => {
   if (!requireMaster(req, res)) return;
 
-  store.cleanupSessions();
-
-  const config = req.body?.config;
-  const finalConfig = isValidConfig(config) ? config : DEFAULT_CONFIG;
-
-  let code = makeShowCode(5);
-  for (let i = 0; i < 30; i++) {
-    if (!store.getShow(code)) break;
-    code = makeShowCode(5);
+  let code = normalizeCode(req.body?.code);
+  if (code) {
+    if (!isValidCode(code)) return res.status(400).json({ error: "invalid_code" });
+    if (store.getUser(code)) return res.status(409).json({ error: "already_exists" });
+  } else {
+    code = makeUserCode(5);
+    for (let i = 0; i < 30; i++) {
+      if (!store.getUser(code)) break;
+      code = makeUserCode(5);
+    }
+    if (store.getUser(code)) return res.status(500).json({ error: "could_not_allocate_code" });
   }
 
-  if (store.getShow(code)) {
-    return res.status(500).json({ error: "could_not_allocate_code" });
-  }
-
-  const adminKey = makeAdminKey();
-  store.setShow(code, {
+  const config = normalizeConfig(req.body?.config);
+  store.setUser(code, {
     code,
-    adminKey,
-    config: finalConfig,
+    config,
     createdAt: Date.now(),
     updatedAt: Date.now()
   });
 
-  res.json({ showCode: code, showId: code, adminKey });
+  res.json({ code });
 });
 
-app.get("/api/shows/:code/config", async (req, res) => {
-  store.cleanupSessions();
-
-  const code = String(req.params.code || "").toUpperCase();
-  const show = store.getShow(code);
-  if (!show) return res.status(404).json({ error: "not_found" });
-  res.json({ config: publicConfig(show.config), updatedAt: show.updatedAt });
+// Master: delete user (code can be reused after delete)
+app.delete("/api/master/users/:code", async (req, res) => {
+  if (!requireMaster(req, res)) return;
+  const code = normalizeCode(req.params.code);
+  if (!isValidCode(code)) return res.status(400).json({ error: "invalid_code" });
+  const ok = store.deleteUser(code);
+  if (!ok) return res.status(404).json({ error: "not_found" });
+  res.json({ ok: true });
 });
 
-app.get("/api/shows/:code/admin", async (req, res) => {
-  store.cleanupSessions();
-
-  const code = String(req.params.code || "").toUpperCase();
-  const show = store.getShow(code);
-  if (!show) return res.status(404).json({ error: "not_found" });
-
-  const key = req.header("x-admin-key") || "";
-  if (!key || !safeEqual(key, show.adminKey)) return res.status(401).json({ error: "unauthorized" });
-
-  res.json({ config: show.config, updatedAt: show.updatedAt });
+// Public: spectator/admin config load
+app.get("/api/users/:code/config", async (req, res) => {
+  const code = normalizeCode(req.params.code);
+  const user = store.getUser(code);
+  if (!user) return res.status(404).json({ error: "not_found" });
+  res.json({ config: normalizeConfig(user.config), updatedAt: user.updatedAt });
 });
 
-app.put("/api/shows/:code/admin", async (req, res) => {
-  store.cleanupSessions();
+// Admin (no auth in MVP): save config
+app.put("/api/users/:code/config", async (req, res) => {
+  const code = normalizeCode(req.params.code);
+  const user = store.getUser(code);
+  if (!user) return res.status(404).json({ error: "not_found" });
 
-  const code = String(req.params.code || "").toUpperCase();
-  const show = store.getShow(code);
-  if (!show) return res.status(404).json({ error: "not_found" });
-
-  const key = req.header("x-admin-key") || "";
-  if (!key || !safeEqual(key, show.adminKey)) return res.status(401).json({ error: "unauthorized" });
-
-  const config = req.body?.config;
-  if (!isValidConfig(config)) return res.status(400).json({ error: "invalid_config" });
-
-  store.updateShow(code, (prev) => ({
+  const config = normalizeConfig(req.body?.config);
+  store.updateUser(code, (prev) => ({
     ...prev,
     config,
     updatedAt: Date.now()
   }));
 
   res.json({ ok: true });
-});
-
-app.post("/api/shows/:code/session", async (req, res) => {
-  store.cleanupSessions();
-
-  const code = String(req.params.code || "").toUpperCase();
-  const show = store.getShow(code);
-  if (!show) return res.status(404).json({ error: "not_found" });
-
-  const sessionId = makeSessionId();
-  store.createSession(code, sessionId);
-
-  res.json({ sessionId });
-});
-
-app.post("/api/shows/:code/reveal", async (req, res) => {
-  store.cleanupSessions();
-
-  const code = String(req.params.code || "").toUpperCase();
-  const show = store.getShow(code);
-  if (!show) return res.status(404).json({ error: "not_found" });
-
-  const sessionId = String(req.body?.sessionId || "");
-  const resultIndex = Number(req.body?.resultIndex);
-  if (!sessionId || !Number.isFinite(resultIndex)) return res.status(400).json({ error: "invalid_request" });
-
-  const sess = store.getSession(code, sessionId);
-  if (!sess) return res.status(400).json({ error: "session_invalid" });
-  if (sess.used) return res.status(400).json({ error: "session_used" });
-
-  const createdAt = Number(sess.createdAt || 0);
-  if (!createdAt || Date.now() - createdAt > 20 * 60 * 1000) {
-    return res.status(400).json({ error: "session_expired" });
-  }
-
-  const pred = (show.config.predictions || []).find((p) => Number(p.id) === resultIndex);
-  if (!pred) return res.status(404).json({ error: "prediction_not_found" });
-
-  store.markSessionUsed(code, sessionId, resultIndex);
-
-  res.json({
-    predictionText: String(pred.text || ""),
-    predictionImageDataUrl: String(pred.imageDataUrl || "")
-  });
 });
 
 const distDir = path.resolve(__dirname, "..", "dist");
@@ -194,3 +203,4 @@ app.listen(port, () => {
   console.log(`server listening on :${port}`);
   console.log(`store file: ${store.filePath}`);
 });
+

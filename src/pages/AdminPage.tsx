@@ -1,381 +1,221 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { AppMode, Direction4, PredictionId } from "../types/config";
-import { AdminPredictionForm } from "../components/AdminPredictionForm";
-import { AdminMotionSettingsForm } from "../components/AdminMotionSettingsForm";
-import { AdminUiSettingsForm } from "../components/AdminUiSettingsForm";
-import { ConfigSummary } from "../components/ConfigSummary";
-import { updateAppConfig, useAppConfigStore } from "../store/useAppConfigStore";
+import type { AppConfig, AppMode, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
-import type { AdminConfigResponse } from "../types/api";
+import type { UserConfigResponse } from "../types/api";
+import { Toolbar } from "../components/Toolbar";
+import type { DrawingTool } from "../hooks/useDrawingCanvas";
+import { MiniDrawingCanvas } from "../components/MiniDrawingCanvas";
 
-const DIRS_4: Direction4[] = ["top", "right", "bottom", "left"];
+const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
 
-function PredictionSelect({
-  value,
-  onChange,
-  options
-}: {
-  value: PredictionId;
-  onChange: (id: PredictionId) => void;
-  options: { id: PredictionId; label: string }[];
-}) {
-  return (
-    <select className="select" value={value} onChange={(e) => onChange(Number(e.target.value) as PredictionId)}>
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
+function normalizeCode(code: string | undefined) {
+  return String(code || "").trim().toUpperCase();
 }
 
-function storageKey(code: string) {
-  return `magic-admin-key:${code}`;
+function predictionIdsForMode(mode: AppMode): PredictionId[] {
+  return mode === 4 ? ([1, 2, 3, 4] as const) : ([1, 2, 3, 4, 5, 6, 7, 8] as const);
+}
+
+function updatePredictionImage(config: AppConfig, id: PredictionId, imageDataUrl: string): AppConfig {
+  return {
+    ...config,
+    predictions: config.predictions.map((p) => (p.id === id ? { ...p, imageDataUrl } : p))
+  };
+}
+
+function labelRuForId(id: PredictionId) {
+  if (id === 1) return "ВЕРХ (медленно)";
+  if (id === 2) return "ПРАВО (медленно)";
+  if (id === 3) return "НИЗ (медленно)";
+  if (id === 4) return "ЛЕВО (медленно)";
+  if (id === 5) return "ВЕРХ (быстро)";
+  if (id === 6) return "ПРАВО (быстро)";
+  if (id === 7) return "НИЗ (быстро)";
+  return "ЛЕВО (быстро)";
 }
 
 export function AdminPage() {
   const params = useParams();
-  const code = (params.code ?? "").toUpperCase();
+  const code = normalizeCode(params.code);
 
-  const config = useAppConfigStore((c) => c);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
+  const [remote, setRemote] = useState<AppConfig | null>(null);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  const [adminKey, setAdminKey] = useState<string>("");
-  const [adminKeyInput, setAdminKeyInput] = useState<string>("");
+  const [color, setColor] = useState(COLORS[0]);
+  const [tool, setTool] = useState<DrawingTool>("pen");
 
-  useEffect(() => {
-    if (!code) return;
-    const saved = localStorage.getItem(storageKey(code)) ?? "";
-    setAdminKey(saved);
-    setAdminKeyInput("");
-  }, [code]);
-
-  const spectatorLink = useMemo(() => {
-    if (!code) return "";
-    return `${window.location.origin}/${encodeURIComponent(code)}`;
-  }, [code]);
-
-  const predictionOptions = useMemo(() => {
-    const count = config.mode === 4 ? 4 : 8;
-    return config.predictions.slice(0, count).map((p) => ({ id: p.id, label: `${p.id}. ${p.label}` }));
-  }, [config.mode, config.predictions]);
-
-  async function loadFromServer(key: string) {
-    const res = await apiGet<AdminConfigResponse>(`/api/shows/${encodeURIComponent(code)}/admin`, {
-      headers: { "x-admin-key": key }
-    });
-    updateAppConfig(() => res.config);
-  }
+  const config = remote ?? DEFAULT_CONFIG;
+  const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
+  const predictionMap = useMemo(() => new Map(config.predictions.map((p) => [p.id, p])), [config.predictions]);
 
   useEffect(() => {
     let cancelled = false;
-
-    async function boot() {
-      if (!code) return;
-      if (!adminKey) return;
-
-      setLoading(true);
+    async function load() {
+      setRemoteError(null);
+      setRemote(null);
+      setSavedAt(null);
       try {
-        await loadFromServer(adminKey);
+        const data = await apiGet<UserConfigResponse>(`/api/users/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
-        setToast("Loaded");
+        setRemote(data.config);
       } catch (e) {
         if (cancelled) return;
-        setToast(e instanceof Error ? `Load failed: ${e.message}` : "Load failed");
-        // invalidate stored key on unauthorized
-        localStorage.removeItem(storageKey(code));
-        setAdminKey("");
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          window.setTimeout(() => setToast(null), 2000);
-        }
+        setRemoteError(e instanceof Error && e.message === "API 404" ? "Такого пользователя нет." : (e instanceof Error ? e.message : "load_failed"));
       }
     }
-
-    boot();
+    if (code) load();
     return () => {
       cancelled = true;
     };
-  }, [adminKey, code]);
+  }, [code]);
 
-  if (!code) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#050507", color: "#fff", padding: 18 }}>
-        <div style={{ maxWidth: 820, margin: "0 auto" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Magician Admin</div>
-          <div
-            style={{
-              background: "#0b0b10",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 14,
-              padding: 14
-            }}
-          >
-            <div style={{ opacity: 0.8, fontSize: 13, lineHeight: 1.4 }}>
-              Нужна ссылка вида <span style={{ fontFamily: "ui-monospace" }}>/&lt;CODE&gt;/admin</span>.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!adminKey) {
-    return (
-      <div style={{ minHeight: "100vh", background: "#050507", color: "#fff", padding: 18 }}>
-        <div style={{ maxWidth: 820, margin: "0 auto" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Magician Admin</div>
-          <div
-            style={{
-              background: "#0b0b10",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 14,
-              padding: 14
-            }}
-          >
-            <div style={{ opacity: 0.8, fontSize: 13, lineHeight: 1.4, marginBottom: 10 }}>
-              Введите <b>Admin key</b>, который выдал Master Admin.
-            </div>
-            <input
-              value={adminKeyInput}
-              onChange={(e) => setAdminKeyInput(e.target.value)}
-              placeholder="admin key"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.18)",
-                background: "#06060a",
-                color: "#fff",
-                outline: "none"
-              }}
-            />
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-              <button
-                onClick={() => {
-                  const k = adminKeyInput.trim();
-                  if (!k) return;
-                  localStorage.setItem(storageKey(code), k);
-                  setAdminKey(k);
-                }}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "#ffffff",
-                  color: "#050507",
-                  fontWeight: 800,
-                  cursor: "pointer"
-                }}
-              >
-                Unlock
-              </button>
-              <button
-                onClick={() => window.location.assign("/master")}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "transparent",
-                  color: "#fff",
-                  cursor: "pointer"
-                }}
-              >
-                Go to Master
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const layout = useMemo(() => {
+    if (config.mode === 4) {
+      return [
+        [null, 1, null],
+        [4, null, 2],
+        [null, 3, null]
+      ] as Array<Array<PredictionId | null>>;
+    }
+    // mode=8: two columns per side (slow/fast). Layout is still "cross", but with paired cells.
+    return [
+      [null, 1, 5, null],
+      [4, 8, null, 2],
+      [null, 3, 7, null]
+    ] as Array<Array<PredictionId | null>>;
+  }, [config.mode]);
 
   return (
     <div className="page" style={{ maxWidth: 980, margin: "0 auto" }}>
-      <div
-        className="card"
-        style={{
-          padding: 14,
-          marginBottom: 10,
-          background: "#0b0b10",
-          color: "#fff",
-          borderColor: "rgba(255,255,255,0.12)"
-        }}
-      >
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Magician Admin — {code}</div>
-        <div className="hint" style={{ color: "rgba(255,255,255,0.7)", wordBreak: "break-all" }}>
-          Spectator: {spectatorLink}
+      <div className="card" style={{ padding: 14, borderRadius: 16, marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900 }}>Админка фокусника</div>
+            <div className="hint">
+              Код: <span className="kbd">{code}</span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div className="hint">Режим</div>
+            <button
+              className={config.mode === 4 ? "btn btnPrimary" : "btn"}
+              onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), mode: 4 }))}
+            >
+              4
+            </button>
+            <button
+              className={config.mode === 8 ? "btn btnPrimary" : "btn"}
+              onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), mode: 8 }))}
+            >
+              8
+            </button>
+          </div>
         </div>
-        <div className="row" style={{ flexWrap: "wrap", marginTop: 10 }}>
-          <button
-            className="btn btnPrimary"
-            disabled={loading}
-            onClick={async () => {
-              setLoading(true);
-              try {
-                await apiSend<{ ok: boolean }>(
-                  `/api/shows/${encodeURIComponent(code)}/admin`,
-                  "PUT",
-                  { config },
-                  { "x-admin-key": adminKey }
-                );
-                setToast("Saved to server");
-              } catch (e) {
-                setToast(e instanceof Error ? `Save failed: ${e.message}` : "Save failed");
-              } finally {
-                setLoading(false);
-                window.setTimeout(() => setToast(null), 2200);
-              }
-            }}
-          >
-            Save to server
-          </button>
-          <button
-            className="btn"
-            disabled={loading}
-            onClick={async () => {
-              setLoading(true);
-              try {
-                await loadFromServer(adminKey);
-                setToast("Reloaded");
-              } catch (e) {
-                setToast(e instanceof Error ? `Reload failed: ${e.message}` : "Reload failed");
-              } finally {
-                setLoading(false);
-                window.setTimeout(() => setToast(null), 2200);
-              }
-            }}
-          >
-            Reload
-          </button>
-          <button className="btn" onClick={() => navigator.clipboard.writeText(spectatorLink)}>
-            Copy spectator link
-          </button>
-          <button className="btn" onClick={() => window.open(spectatorLink, "_blank")}>
-            Open spectator
-          </button>
-          <button className="btn" onClick={() => setShowSummary((v) => !v)}>
-            Config summary
-          </button>
-          <button
-            className="btn btnDanger"
-            onClick={() => {
-              updateAppConfig(() => DEFAULT_CONFIG);
-              setToast("Reset locally (save to apply)");
-              window.setTimeout(() => setToast(null), 2200);
-            }}
-          >
-            Reset local
-          </button>
-          <button
-            className="btn"
-            onClick={() => {
-              localStorage.removeItem(storageKey(code));
-              setAdminKey("");
-              setToast("Locked");
-              window.setTimeout(() => setToast(null), 1200);
-            }}
-          >
-            Lock
-          </button>
-        </div>
-        {toast && <div className="hint" style={{ marginTop: 8, color: "rgba(255,255,255,0.7)" }}>{toast}</div>}
+
+        {remoteError && (
+          <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 700 }}>
+            {remoteError} Откройте правильную ссылку вида <span className="kbd">/12345/admin</span> (и убедитесь, что ID создан в мастер‑админке).
+          </div>
+        )}
       </div>
 
-      <div className="row" style={{ gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 460px" }}>
-          <AdminPredictionForm
-            mode={config.mode}
-            predictions={config.predictions}
-            onChange={(predictions) => updateAppConfig((prev) => ({ ...prev, predictions }))}
-          />
+      <Toolbar colors={COLORS} selectedColor={color} tool={tool} onSelectColor={setColor} onSelectTool={setTool} onClear={() => {
+        // In admin, "Очистить" clears all active predictions in current mode.
+        setRemote((prev) => {
+          const base = prev ?? DEFAULT_CONFIG;
+          const ids = predictionIdsForMode(base.mode);
+          return {
+            ...base,
+            predictions: base.predictions.map((p) => (ids.includes(p.id as any) ? { ...p, imageDataUrl: "" } : p))
+          };
+        });
+      }} />
 
-          <div style={{ height: 10 }} />
+      <div className="card" style={{ padding: 14, borderRadius: 16 }}>
+        <div style={{ fontWeight: 900, marginBottom: 12 }}>Предсказания (рисунки)</div>
 
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Mapping</div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${layout[0]?.length || 3}, minmax(0, 1fr))`,
+            gap: 12,
+            alignItems: "stretch"
+          }}
+        >
+          {layout.flatMap((row, rowIdx) =>
+            row.map((id, colIdx) => {
+              if (!id) return <div key={`${rowIdx}-${colIdx}`} />;
 
-            {config.mode === 4 ? (
-              <div className="col">
-                {DIRS_4.map((dir) => (
-                  <div key={dir} className="row" style={{ justifyContent: "space-between" }}>
-                    <div className="label" style={{ minWidth: 90 }}>
-                      {dir} →
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <PredictionSelect
-                        value={config.mapping4[dir]}
-                        options={predictionOptions}
-                        onChange={(id) => {
-                          updateAppConfig((prev) => ({
-                            ...prev,
-                            mapping4: { ...prev.mapping4, [dir]: id }
-                          }));
-                        }}
-                      />
-                    </div>
+              const p = predictionMap.get(id);
+              if (!p || !activeIds.includes(id)) return <div key={`${rowIdx}-${colIdx}`} />;
+
+              return (
+                <div key={`${rowIdx}-${colIdx}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
+                    <button
+                      className="btn"
+                      onClick={() => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, ""))}
+                      style={{ padding: "6px 10px" }}
+                    >
+                      Очистить
+                    </button>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="col">
-                <div className="hint">mode=8 — experimental placeholder-ready.</div>
-                <button
-                  className="btn"
-                  onClick={() =>
-                    updateAppConfig((prev) => ({
-                      ...prev,
-                      mapping8: prev.mapping8 ?? DEFAULT_CONFIG.mapping8
-                    }))
-                  }
-                >
-                  Initialize mapping8 placeholder
-                </button>
-              </div>
-            )}
-          </div>
+
+                  <MiniDrawingCanvas
+                    value={p.imageDataUrl}
+                    color={color}
+                    tool={tool}
+                    onChange={(dataUrl) => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, dataUrl))}
+                    height={170}
+                  />
+                </div>
+              );
+            })
+          )}
         </div>
 
-        <div style={{ flex: "1 1 360px" }}>
-          <div className="card" style={{ padding: 14, marginBottom: 10 }}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Mode</div>
-            <select
-              className="select"
-              value={config.mode}
-              onChange={(e) => {
-                const mode = Number(e.target.value) as AppMode;
-                updateAppConfig((prev) => ({ ...prev, mode }));
-              }}
-            >
-              <option value={4}>4 outcomes</option>
-              <option value={8}>8 outcomes (experimental)</option>
-            </select>
-          </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14, alignItems: "center" }}>
+          <button
+            className="btn btnPrimary"
+            disabled={saving || !!remoteError}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                const toSave: AppConfig = {
+                  ...config,
+                  // Ensure predictions array is always 1..8
+                  predictions: DEFAULT_CONFIG.predictions.map((base) => {
+                    const prev = config.predictions.find((p) => p.id === base.id);
+                    return {
+                      ...base,
+                      imageDataUrl: String(prev?.imageDataUrl || "")
+                    };
+                  })
+                };
+                await apiSend(`/api/users/${encodeURIComponent(code)}/config`, "PUT", { config: toSave });
+                setSavedAt(Date.now());
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? "Сохранение…" : "Применить изменения"}
+          </button>
 
-          <AdminMotionSettingsForm
-            motion={config.motion}
-            onChange={(motion) => updateAppConfig((prev) => ({ ...prev, motion }))}
-          />
+          {savedAt && <div className="hint">Сохранено: {new Date(savedAt).toLocaleTimeString()}</div>}
+        </div>
 
-          <div style={{ height: 10 }} />
-
-          <AdminUiSettingsForm ui={config.ui} onChange={(ui) => updateAppConfig((prev) => ({ ...prev, ui }))} />
-
-          {showSummary && (
-            <>
-              <div style={{ height: 10 }} />
-              <ConfigSummary config={config} />
-            </>
-          )}
+        <div className="hint" style={{ marginTop: 10 }}>
+          Дальше: откройте зрительскую ссылку <span className="kbd">/{code}</span>, сделайте двойной быстрый тап по экрану, положите телефон экраном вниз и переворачивайте через нужный край.
         </div>
       </div>
     </div>
   );
 }
+

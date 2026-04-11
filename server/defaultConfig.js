@@ -1,32 +1,31 @@
 export const DEFAULT_CONFIG = {
-  version: 1,
+  version: 2,
   mode: 4,
+  // 1..4: slow top/right/bottom/left
+  // 5..8: fast top/right/bottom/left
   predictions: [1, 2, 3, 4, 5, 6, 7, 8].map((id) => ({
     id,
-    label: `Prediction ${id}`,
-    text: id <= 4 ? `Заглушка ${id}` : "",
+    label:
+      id === 1
+        ? "Top (slow)"
+        : id === 2
+          ? "Right (slow)"
+          : id === 3
+            ? "Bottom (slow)"
+            : id === 4
+              ? "Left (slow)"
+              : id === 5
+                ? "Top (fast)"
+                : id === 6
+                  ? "Right (fast)"
+                  : id === 7
+                    ? "Bottom (fast)"
+                    : "Left (fast)",
     imageDataUrl: ""
   })),
-  mapping4: {
-    top: 1,
-    right: 2,
-    bottom: 3,
-    left: 4
-  },
-  mapping8: {
-    experimental: true,
-    map: {}
-  },
   motion: {
-    countdownSeconds: 5,
-    calibrationMs: 400,
+    calibrationMs: 350,
     motionThreshold: 3.5,
-    confidenceThreshold: 0.6
-  },
-  ui: {
-    showEnableSensorsButton: true,
-    showClearCanvasButton: true,
-    showResetHiddenStateButton: true,
-    enableDebugMode: false
+    fastFlipMs: 350
   }
 };

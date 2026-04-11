@@ -1,217 +1,150 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DrawingCanvas } from "../components/DrawingCanvas";
+import type { DrawingCanvasApi } from "../components/DrawingCanvas";
 import { Toolbar } from "../components/Toolbar";
-import { CountdownOverlay } from "../components/CountdownOverlay";
-import {
-  resetSpectatorHiddenState,
-  updateSpectatorHiddenState,
-  useSpectatorStateStore
-} from "../store/useSpectatorStateStore";
+import type { DrawingTool } from "../hooks/useDrawingCanvas";
 import { useMotionClassifier } from "../hooks/useMotionClassifier";
-import type { AppConfig } from "../types/config";
+import type { AppConfig, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
-import { apiGet, apiSend } from "../utils/api";
-import type { PublicConfigResponse, RevealResponse, SessionResponse } from "../types/api";
+import { apiGet } from "../utils/api";
+import type { UserConfigResponse } from "../types/api";
 
-const PALETTE = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
+const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
 
-function toSpectatorConfig(publicConfig: PublicConfigResponse["config"]): AppConfig {
-  return {
-    ...publicConfig,
-    predictions: publicConfig.predictions.map((p) => ({
-      id: p.id as any,
-      label: p.label,
-      text: "",
-      imageDataUrl: ""
-    }))
-  } as AppConfig;
+function normalizeCode(code: string | undefined) {
+  return String(code || "").trim().toUpperCase();
+}
+
+function findPredictionImage(config: AppConfig, id: PredictionId) {
+  const p = config.predictions.find((x) => x.id === id);
+  return String(p?.imageDataUrl || "");
+}
+
+function isDoubleTap(lastTapAt: number, now: number) {
+  return now - lastTapAt <= 260;
 }
 
 export function DrawPage() {
   const params = useParams();
-  const code = (params.code ? String(params.code).toUpperCase() : null) as string | null;
+  const code = normalizeCode(params.code);
 
   const [remoteConfig, setRemoteConfig] = useState<AppConfig | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [color, setColor] = useState<string>(PALETTE[0]);
-  const [canvasApi, setCanvasApi] = useState<{ clear: () => void } | null>(null);
+  const [color, setColor] = useState(COLORS[0]);
+  const [tool, setTool] = useState<DrawingTool>("pen");
+  const [canvasApi, setCanvasApi] = useState<DrawingCanvasApi | null>(null);
 
-  const baseConfig = remoteConfig ?? DEFAULT_CONFIG;
-  const classifier = useMotionClassifier(baseConfig);
-  const ui = baseConfig.ui;
+  const config = remoteConfig ?? DEFAULT_CONFIG;
+  const motion = useMotionClassifier(config);
 
-  const hidden = useSpectatorStateStore((s) => s);
-  const revealStartedRef = useRef(false);
+  const lastTapAtRef = useRef<number>(0);
+  const revealAppliedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
-      if (!code) {
-        setRemoteError("Нужна spectator ссылка вида /draw/<code>.");
-        setRemoteConfig(null);
-        setSessionId(null);
-        revealStartedRef.current = false;
-        return;
-      }
-
+      setLoading(true);
       setRemoteError(null);
       setRemoteConfig(null);
-      setSessionId(null);
-      revealStartedRef.current = false;
-
+      revealAppliedRef.current = false;
       try {
-        const data = await apiGet<PublicConfigResponse>(`/api/shows/${encodeURIComponent(code)}/config`);
+        const data = await apiGet<UserConfigResponse>(`/api/users/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
-        setRemoteConfig(toSpectatorConfig(data.config));
-
-        const session = await apiSend<SessionResponse>(
-          `/api/shows/${encodeURIComponent(code)}/session`,
-          "POST",
-          {}
-        );
-        if (cancelled) return;
-        setSessionId(session.sessionId);
+        setRemoteConfig(data.config);
       } catch (e) {
         if (cancelled) return;
-        setRemoteError(e instanceof Error && e.message === "API 404" ? "Код шоу не найден. Проверьте ссылку." : (e instanceof Error ? e.message : "Не удалось загрузить настройки"));
+        setRemoteError(e instanceof Error && e.message === "API 404" ? "Такой страницы не существует." : (e instanceof Error ? e.message : "load_failed"));
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
-
-    load();
+    if (code) load();
     return () => {
       cancelled = true;
     };
   }, [code]);
 
+  // Apply prediction drawing once after lock.
   useEffect(() => {
-    async function reveal() {
-      if (!code) return;
-      if (!sessionId) return;
-      if (revealStartedRef.current) return;
-      if (classifier.appState !== "locked") return;
-      if (!hidden.classifiedResultIndex) return;
+    async function apply() {
+      if (!canvasApi) return;
+      if (revealAppliedRef.current) return;
+      if (motion.state !== "locked") return;
+      if (!motion.result) return;
 
-      revealStartedRef.current = true;
-      try {
-        const data = await apiSend<RevealResponse>(
-          `/api/shows/${encodeURIComponent(code)}/reveal`,
-          "POST",
-          { sessionId, resultIndex: hidden.classifiedResultIndex }
-        );
+      const img = findPredictionImage(config, motion.result.predictionId);
+      if (!img) return;
 
-        updateSpectatorHiddenState((prev) => ({
-          ...prev,
-          selectedPredictionText: data.predictionText?.trim() ? data.predictionText : null,
-          selectedPredictionImageDataUrl: data.predictionImageDataUrl?.trim() ? data.predictionImageDataUrl : null
-        }));
-      } catch {
-        // ignore
-      }
+      revealAppliedRef.current = true;
+      await canvasApi.drawFromDataUrl(img, { clear: false });
     }
+    apply().catch(() => undefined);
+  }, [canvasApi, config, motion.result, motion.state]);
 
-    reveal();
-  }, [classifier.appState, hidden.classifiedResultIndex, sessionId, code]);
-
-  const enableLabel = useMemo(() => {
-    if (classifier.appState === "requestingPermission") return "Разрешение…";
-    if (classifier.appState === "countdown") return "Подготовка…";
-    if (classifier.appState === "calibrating") return "Калибровка…";
-    if (classifier.appState === "armed") return "Готово";
-    if (classifier.appState === "locked") return "Готово";
-    return "Включить датчики";
-  }, [classifier.appState]);
-
-  const overlay = useMemo(() => {
+  const spectatorUi = useMemo(() => {
     if (remoteError) {
-      return { visible: true, title: "Ошибка", subtitle: remoteError, value: undefined as number | undefined };
-    }
-
-    if (code && !remoteConfig) {
-      return { visible: true, title: "Загрузка", subtitle: "Подготовка…", value: undefined as number | undefined };
-    }
-
-    if (classifier.appState === "countdown") {
-      return {
-        visible: true,
-        title: "Подготовка",
-        subtitle: "Положите телефон и подождите окончания отсчёта.",
-        value: classifier.countdownValue
-      };
-    }
-    if (classifier.appState === "calibrating") {
-      return {
-        visible: true,
-        title: "Калибровка",
-        subtitle: "Пожалуйста, не двигайте телефон.",
-        value: undefined as number | undefined
-      };
-    }
-
-    return { visible: false, title: "", subtitle: undefined as string | undefined, value: undefined as number | undefined };
-  }, [classifier.appState, classifier.countdownValue, remoteConfig, remoteError, code]);
-
-  return (
-    <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Toolbar
-        showEnableSensorsButton={ui.showEnableSensorsButton}
-        showClearCanvasButton={ui.showClearCanvasButton}
-        showResetHiddenStateButton={ui.showResetHiddenStateButton}
-        enableButtonLabel={enableLabel}
-        disabledEnable={
-          classifier.appState !== "idle" && classifier.appState !== "armed" && classifier.appState !== "locked"
-        }
-        onEnableSensors={() => classifier.enableSensors()}
-        onClearCanvas={() => canvasApi?.clear()}
-        onResetHiddenState={() => {
-          classifier.resetClassifier();
-          resetSpectatorHiddenState();
-          revealStartedRef.current = false;
-        }}
-        colors={PALETTE}
-        selectedColor={color}
-        onSelectColor={setColor}
-      />
-
-      {classifier.permissionError && !ui.enableDebugMode && (
-        <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: "rgba(185,28,28,0.25)" }}>
-          <div style={{ fontWeight: 700, color: "#b91c1c", marginBottom: 4 }}>Не удалось включить датчики</div>
-          <div className="hint">{classifier.permissionError}</div>
-        </div>
-      )}
-
-      <DrawingCanvas color={color} onReady={(api) => setCanvasApi(api)} />
-
-      <CountdownOverlay visible={overlay.visible} title={overlay.title} subtitle={overlay.subtitle} value={overlay.value} />
-
-      {ui.enableDebugMode && (
-        <div className="card" style={{ padding: 12, marginTop: 10 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Debug</div>
-          <div className="col" style={{ gap: 6, fontSize: 12 }}>
-            <div>
-              code: <span className="kbd">{String(code)}</span>
-            </div>
-            <div>
-              sessionId: <span className="kbd">{sessionId ? "yes" : "no"}</span>
-            </div>
-            <div>
-              state: <span className="kbd">{classifier.appState}</span>
-            </div>
-            <div>
-              classifiedResultIndex: <span className="kbd">{String(hidden.classifiedResultIndex)}</span>
-            </div>
-            <div>
-              selectedPredictionText: <span className="kbd">{String(hidden.selectedPredictionText)}</span>
-            </div>
-            <div>
-              selectedPredictionImage: <span className="kbd">{hidden.selectedPredictionImageDataUrl ? "yes" : "no"}</span>
-            </div>
+      return (
+        <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div className="card" style={{ padding: 14, borderRadius: 16 }}>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Ошибка</div>
+            <div className="hint">{remoteError}</div>
           </div>
         </div>
+      );
+    }
+
+    if (loading && !remoteConfig) {
+      return (
+        <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
+          <div className="card" style={{ padding: 14, borderRadius: 16 }}>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>Загрузка…</div>
+            <div className="hint">Подготовка страницы…</div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  }, [loading, remoteConfig, remoteError]);
+
+  if (spectatorUi) return spectatorUi;
+
+  return (
+    <div
+      className="page"
+      style={{ maxWidth: 720, margin: "0 auto" }}
+      onPointerDown={async () => {
+        const now = Date.now();
+        if (isDoubleTap(lastTapAtRef.current, now)) {
+          lastTapAtRef.current = 0;
+          revealAppliedRef.current = false;
+          await motion.arm();
+        } else {
+          lastTapAtRef.current = now;
+        }
+      }}
+    >
+      {motion.permissionError && (
+        <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: "rgba(185,28,28,0.25)" }}>
+          <div style={{ fontWeight: 900, color: "#b91c1c", marginBottom: 4 }}>Не удалось включить датчики</div>
+          <div className="hint">{motion.permissionError}</div>
+        </div>
       )}
+
+      <Toolbar
+        colors={COLORS}
+        selectedColor={color}
+        tool={tool}
+        onSelectColor={setColor}
+        onSelectTool={setTool}
+        onClear={() => canvasApi?.clear()}
+      />
+
+      <DrawingCanvas color={color} tool={tool} onReady={setCanvasApi} />
     </div>
   );
 }
+

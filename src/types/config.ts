@@ -1,47 +1,30 @@
 export type AppMode = 4 | 8;
 
 export type Direction4 = "top" | "right" | "bottom" | "left";
+export type FlipSpeed = "slow" | "fast";
 
 export type PredictionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type PredictionItem = {
   id: PredictionId;
   label: string;
-  text: string;
-  // Опциональный рисунок предсказания (data URL, хранится в localStorage).
-  imageDataUrl?: string;
-};
-
-export type Mapping4 = Record<Direction4, PredictionId>;
-
-// Placeholder-ready структура для будущего 8-направленного mapping/classification.
-// В MVP классификация остается 4-направленной, а mode=8 использует graceful fallback.
-export type Mapping8 = {
-  experimental: true;
-  // Например, позже можно описать ключи как "topLeft" | "top" | "topRight" | ...
-  map: Record<string, PredictionId>;
+  // PNG data URL. Empty string = not set yet.
+  imageDataUrl: string;
 };
 
 export type MotionConfig = {
-  countdownSeconds: number;
+  // How long to sample a "resting" baseline after arming (ms).
   calibrationMs: number;
+  // Delta magnitude threshold to start detecting a flip (m/s^2-ish units from devicemotion).
   motionThreshold: number;
-  confidenceThreshold: number;
-};
-
-export type UiConfig = {
-  showEnableSensorsButton: boolean;
-  showClearCanvasButton: boolean;
-  showResetHiddenStateButton: boolean;
-  enableDebugMode: boolean;
+  // Flip duration <= fastFlipMs is considered "fast" (for mode=8).
+  fastFlipMs: number;
 };
 
 export type AppConfig = {
-  version: 1;
+  version: 2;
   mode: AppMode;
   predictions: PredictionItem[];
-  mapping4: Mapping4;
-  mapping8?: Mapping8;
   motion: MotionConfig;
-  ui: UiConfig;
 };
+

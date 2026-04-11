@@ -1,40 +1,35 @@
 import type { AppConfig, PredictionId } from "../types/config";
 
-function predictionLabel(id: PredictionId) {
-  return `Prediction ${id}`;
+function labelFor(id: PredictionId) {
+  return id === 1
+    ? "Top (slow)"
+    : id === 2
+      ? "Right (slow)"
+      : id === 3
+        ? "Bottom (slow)"
+        : id === 4
+          ? "Left (slow)"
+          : id === 5
+            ? "Top (fast)"
+            : id === 6
+              ? "Right (fast)"
+              : id === 7
+                ? "Bottom (fast)"
+                : "Left (fast)";
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  version: 1,
+  version: 2,
   mode: 4,
   predictions: ([1, 2, 3, 4, 5, 6, 7, 8] as const).map((id) => ({
     id,
-    label: predictionLabel(id),
-    text: id <= 4 ? `Заглушка ${id}` : "",
+    label: labelFor(id),
     imageDataUrl: ""
   })),
-  mapping4: {
-    top: 1,
-    right: 2,
-    bottom: 3,
-    left: 4
-  },
-  mapping8: {
-    experimental: true,
-    map: {}
-  },
   motion: {
-    countdownSeconds: 5,
-    calibrationMs: 400,
-    // MVP-дефолт: достаточно высокий порог, чтобы не ловить мелкий шум.
+    calibrationMs: 350,
     motionThreshold: 3.5,
-    // 0..1
-    confidenceThreshold: 0.6
-  },
-  ui: {
-    showEnableSensorsButton: true,
-    showClearCanvasButton: true,
-    showResetHiddenStateButton: true,
-    enableDebugMode: false
+    fastFlipMs: 350
   }
 };
+
