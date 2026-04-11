@@ -17,7 +17,7 @@
 Backend — Node/Express + Postgres.
 
 API:
-- `POST /api/master/shows` (header `x-master-token`) → создаёт шоу, возвращает `{showId, adminKey}`
+- `POST /api/master/shows` (header `Basic Auth (Authorization)`) → создаёт шоу, возвращает `{showId, adminKey}`
 - `GET /api/shows/:id/config` → public-config (без текстов/картинок предсказаний)
 - `GET/PUT /api/shows/:id/admin` (header `x-admin-key`) → полный конфиг для фокусника
 - `POST /api/shows/:id/session` → выдаёт `sessionId`
@@ -27,7 +27,7 @@ API:
 
 Нужен Postgres и переменные окружения:
 - `DATABASE_URL` (строка подключения Postgres)
-- `MASTER_TOKEN` (секрет для страницы `/master`)
+- `MASTER_USER / MASTER_PASS` (секрет для страницы `/master`)
 
 ```bash
 npm install
@@ -44,7 +44,7 @@ npm run dev
 2) Создай Web Service из этого репозитория.
 3) Env vars в Web Service:
 - `DATABASE_URL` — из Postgres
-- `MASTER_TOKEN` — придумай и сохрани
+- `MASTER_USER / MASTER_PASS` — придумай и сохрани
 
 Команды:
 - Build: `npm install && npm run build`
@@ -52,7 +52,7 @@ npm run dev
 
 ## Как пользоваться (быстро)
 
-1) Открой `/master`, введи `MASTER_TOKEN`, нажми **Generate links**.
+1) Открой `/master`, введи `MASTER_USER / MASTER_PASS`, нажми **Generate links**.
 2) Отдай фокуснику ссылку **Magician admin (private)**.
 3) Фокусник на своей ссылке настроит предсказания/mapping → **Save to server**.
 4) Зрителю даёшь `/draw/:showId` — там подхватятся настройки.

@@ -3,21 +3,34 @@ import { apiSend } from "../utils/api";
 import type { CreateShowResponse } from "../types/api";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 
-const LS_MASTER = "magic-master-token-v1";
+const LS_MASTER_USER = "magic-master-user-v1";
+const LS_MASTER_PASS = "magic-master-pass-v1";
+
+function basicAuthHeader(user: string, pass: string) {
+  const token = btoa(`${user}:${pass}`);
+  return `Basic ${token}`;
+}
 
 export function MasterPage() {
-  const [masterToken, setMasterToken] = useState("");
+  const [masterUser, setMasterUser] = useState("");
+  const [masterPass, setMasterPass] = useState("");
   const [created, setCreated] = useState<CreateShowResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(LS_MASTER);
-    if (saved) setMasterToken(saved);
+    const savedUser = localStorage.getItem(LS_MASTER_USER);
+    const savedPass = localStorage.getItem(LS_MASTER_PASS);
+    if (savedUser) setMasterUser(savedUser);
+    if (savedPass) setMasterPass(savedPass);
   }, []);
 
   useEffect(() => {
-    if (masterToken) localStorage.setItem(LS_MASTER, masterToken);
-  }, [masterToken]);
+    if (masterUser) localStorage.setItem(LS_MASTER_USER, masterUser);
+  }, [masterUser]);
+
+  useEffect(() => {
+    if (masterPass) localStorage.setItem(LS_MASTER_PASS, masterPass);
+  }, [masterPass]);
 
   const links = useMemo(() => {
     if (!created) return null;
@@ -50,22 +63,45 @@ export function MasterPage() {
             marginBottom: 12
           }}
         >
-          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>MASTER_TOKEN</div>
-          <input
-            value={masterToken}
-            onChange={(e) => setMasterToken(e.target.value)}
-            placeholder="введите master token"
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.18)",
-              background: "#06060a",
-              color: "#fff",
-              outline: "none"
-            }}
-          />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 220px" }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Login</div>
+              <input
+                value={masterUser}
+                onChange={(e) => setMasterUser(e.target.value)}
+                placeholder="master"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "#06060a",
+                  color: "#fff",
+                  outline: "none"
+                }}
+              />
+            </div>
+            <div style={{ flex: "1 1 220px" }}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Password</div>
+              <input
+                value={masterPass}
+                onChange={(e) => setMasterPass(e.target.value)}
+                placeholder="master123"
+                type="password"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "#06060a",
+                  color: "#fff",
+                  outline: "none"
+                }}
+              />
+            </div>
+          </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
             <button
@@ -77,7 +113,7 @@ export function MasterPage() {
                     "/api/master/shows",
                     "POST",
                     { config: DEFAULT_CONFIG },
-                    { "x-master-token": masterToken }
+                    { Authorization: basicAuthHeader(masterUser, masterPass) }
                   );
                   setCreated(res);
                 } catch (e) {
@@ -99,6 +135,10 @@ export function MasterPage() {
           </div>
 
           {error && <div style={{ marginTop: 10, color: "#ffb4b4", fontSize: 12 }}>{error}</div>}
+
+          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
+            По умолчанию (если не задано в env): <span style={{ fontFamily: "ui-monospace" }}>master / master123</span>
+          </div>
         </div>
 
         <div

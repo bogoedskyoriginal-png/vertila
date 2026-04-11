@@ -17,16 +17,39 @@ app.use(express.json({ limit: "10mb" }));
 let pool;
 
 function requireMaster(req, res) {
-  const token = process.env.MASTER_TOKEN;
-  if (!token) {
-    res.status(501).json({ error: "MASTER_TOKEN is not configured" });
-    return false;
-  }
-  const got = req.header("x-master-token") || "";
-  if (!got || !safeEqual(got, token)) {
+  // MVP: мастер-доступ через логин/пароль.
+  // Можно переопределить через env MASTER_USER / MASTER_PASS.
+  const user = process.env.MASTER_USER || "master";
+  const pass = process.env.MASTER_PASS || "master123";
+
+  const auth = req.header("authorization") || "";
+  if (!auth.startsWith("Basic ")) {
     res.status(401).json({ error: "unauthorized" });
     return false;
   }
+
+  let decoded = "";
+  try {
+    decoded = Buffer.from(auth.slice(6), "base64").toString("utf8");
+  } catch {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+
+  const idx = decoded.indexOf(":");
+  if (idx <= 0) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+
+  const gotUser = decoded.slice(0, idx);
+  const gotPass = decoded.slice(idx + 1);
+
+  if (!safeEqual(gotUser, user) || !safeEqual(gotPass, pass)) {
+    res.status(401).json({ error: "unauthorized" });
+    return false;
+  }
+
   return true;
 }
 
