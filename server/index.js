@@ -98,7 +98,7 @@ app.post("/api/master/shows", async (req, res) => {
 app.get("/api/shows/:code/config", async (req, res) => {
   store.cleanupSessions();
 
-  const code = String(req.params.code || "");
+  const code = String(req.params.code || "").toUpperCase();
   const show = store.getShow(code);
   if (!show) return res.status(404).json({ error: "not_found" });
   res.json({ config: publicConfig(show.config), updatedAt: show.updatedAt });
@@ -107,7 +107,7 @@ app.get("/api/shows/:code/config", async (req, res) => {
 app.get("/api/shows/:code/admin", async (req, res) => {
   store.cleanupSessions();
 
-  const code = String(req.params.code || "");
+  const code = String(req.params.code || "").toUpperCase();
   const show = store.getShow(code);
   if (!show) return res.status(404).json({ error: "not_found" });
 
@@ -120,7 +120,7 @@ app.get("/api/shows/:code/admin", async (req, res) => {
 app.put("/api/shows/:code/admin", async (req, res) => {
   store.cleanupSessions();
 
-  const code = String(req.params.code || "");
+  const code = String(req.params.code || "").toUpperCase();
   const show = store.getShow(code);
   if (!show) return res.status(404).json({ error: "not_found" });
 
@@ -142,7 +142,7 @@ app.put("/api/shows/:code/admin", async (req, res) => {
 app.post("/api/shows/:code/session", async (req, res) => {
   store.cleanupSessions();
 
-  const code = String(req.params.code || "");
+  const code = String(req.params.code || "").toUpperCase();
   const show = store.getShow(code);
   if (!show) return res.status(404).json({ error: "not_found" });
 
@@ -155,7 +155,7 @@ app.post("/api/shows/:code/session", async (req, res) => {
 app.post("/api/shows/:code/reveal", async (req, res) => {
   store.cleanupSessions();
 
-  const code = String(req.params.code || "");
+  const code = String(req.params.code || "").toUpperCase();
   const show = store.getShow(code);
   if (!show) return res.status(404).json({ error: "not_found" });
 

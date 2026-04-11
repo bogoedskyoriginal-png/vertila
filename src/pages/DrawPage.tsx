@@ -30,7 +30,7 @@ function toSpectatorConfig(publicConfig: PublicConfigResponse["config"]): AppCon
 
 export function DrawPage() {
   const params = useParams();
-  const code = (params.code ?? null) as string | null;
+  const code = (params.code ? String(params.code).toUpperCase() : null) as string | null;
 
   const [remoteConfig, setRemoteConfig] = useState<AppConfig | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
@@ -77,7 +77,7 @@ export function DrawPage() {
         setSessionId(session.sessionId);
       } catch (e) {
         if (cancelled) return;
-        setRemoteError(e instanceof Error ? e.message : "Не удалось загрузить настройки");
+        setRemoteError(e instanceof Error && e.message === "API 404" ? "Код шоу не найден. Проверьте ссылку." : (e instanceof Error ? e.message : "Не удалось загрузить настройки"));
       }
     }
 
