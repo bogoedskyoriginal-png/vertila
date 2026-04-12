@@ -1,6 +1,7 @@
 export const DEFAULT_CONFIG = {
-  version: 2,
+  version: 3,
   mode: 4,
+  outputMode: "drawings",
   // 1..4: slow top/right/bottom/left
   // 5..8: fast top/right/bottom/left
   predictions: [1, 2, 3, 4, 5, 6, 7, 8].map((id) => ({
@@ -22,6 +23,7 @@ export const DEFAULT_CONFIG = {
                     ? "Bottom (fast)"
                     : "Left (fast)",
     imageDataUrl: "",
+    linkQuery: "",
     drawing: { v: 1, aspect: 9 / 16, strokes: [] }
   })),
   motion: {

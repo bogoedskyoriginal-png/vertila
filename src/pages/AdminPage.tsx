@@ -24,6 +24,13 @@ function updatePredictionImage(config: AppConfig, id: PredictionId, imageDataUrl
   };
 }
 
+function updatePredictionLinkQuery(config: AppConfig, id: PredictionId, linkQuery: string): AppConfig {
+  return {
+    ...config,
+    predictions: config.predictions.map((p) => (p.id === id ? { ...p, linkQuery } : p))
+  };
+}
+
 function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: PredictionDrawing): AppConfig {
   return {
     ...config,
@@ -109,11 +116,23 @@ export function AdminPage() {
       <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
           <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelForId(id)}</div>
-          <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
-            Редактировать
-          </button>
+          {config.outputMode === "drawings" ? (
+            <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
+              Редактировать
+            </button>
+          ) : null}
         </div>
-        <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
+        {config.outputMode === "drawings" ? (
+          <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
+        ) : (
+          <input
+            className="input"
+            value={String(p.linkQuery || "")}
+            onChange={(e) => setRemote((prev) => updatePredictionLinkQuery(prev ?? DEFAULT_CONFIG, id, e.target.value))}
+            placeholder="Слово для Google картинок (или https://...)"
+            style={{ minHeight: 46 }}
+          />
+        )}
       </div>
     );
   }
@@ -152,6 +171,22 @@ export function AdminPage() {
             >
               8
             </button>
+
+            <div className="hint" style={{ marginLeft: 6 }}>
+              Вывод
+            </div>
+            <button
+              className={config.outputMode === "drawings" ? "btn btnPrimary" : "btn"}
+              onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), outputMode: "drawings" }))}
+            >
+              Рисунки
+            </button>
+            <button
+              className={config.outputMode === "google_images" ? "btn btnPrimary" : "btn"}
+              onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), outputMode: "google_images" }))}
+            >
+              Ссылки
+            </button>
           </div>
         </div>
 
@@ -179,11 +214,13 @@ export function AdminPage() {
                   name,
                   createdAt: Date.now(),
                   mode: config.mode,
+                  outputMode: config.outputMode,
                   predictions: DEFAULT_CONFIG.predictions.map((base) => {
                     const prev = config.predictions.find((p) => p.id === base.id);
                     return {
                       id: base.id,
                       imageDataUrl: String(prev?.imageDataUrl || ""),
+                      linkQuery: String(prev?.linkQuery || ""),
                       drawing:
                         prev?.drawing && prev.drawing.v === 1
                           ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
@@ -228,12 +265,14 @@ export function AdminPage() {
                   return {
                     ...base,
                     mode: selectedTemplate.mode,
+                    outputMode: selectedTemplate.outputMode ?? base.outputMode,
                     predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
                       const found = byId.get(pBase.id);
                       if (!found) return { ...pBase };
                       return {
                         ...pBase,
                         imageDataUrl: String(found.imageDataUrl || ""),
+                        linkQuery: String(found.linkQuery || ""),
                         drawing: found.drawing && found.drawing.v === 1 ? found.drawing : { v: 1, aspect: 9 / 16, strokes: [] }
                       };
                     })
@@ -287,6 +326,7 @@ export function AdminPage() {
                     return {
                       ...base,
                       imageDataUrl: String(prev?.imageDataUrl || ""),
+                      linkQuery: String(prev?.linkQuery || ""),
                       drawing:
                         prev?.drawing && prev.drawing.v === 1
                           ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
