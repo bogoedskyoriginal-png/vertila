@@ -9,7 +9,9 @@ export const router = createBrowserRouter([
     path: "/",
     element: <App />,
     children: [
-      { index: true, element: <Navigate to="/master" replace /> },
+      { index: true, element: <Navigate to="/crp.html" replace /> },
+      // Master admin (secret entry). Keep /master as an alias for backwards compatibility.
+      { path: "crp.html", element: <MasterPage /> },
       { path: "master", element: <MasterPage /> },
       { path: ":code/admin", element: <AdminPage /> },
       { path: ":code", element: <DrawPage /> }
