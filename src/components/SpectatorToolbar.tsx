@@ -54,25 +54,27 @@ export function SpectatorToolbar({
   hasError
 }: Props) {
   return (
-    <div className="spectatorBar spectatorBarBottom" role="toolbar" aria-label="drawing tools">
-      <PaletteToolbar
-        colors={colors}
-        selectedColor={selectedColor}
-        tool={tool}
-        onSelectColor={onSelectColor}
-        onSelectTool={onSelectTool}
-      />
+    <div className="spectatorBarDock" role="toolbar" aria-label="drawing tools">
+      <div className="spectatorBar">
+        <PaletteToolbar
+          colors={colors}
+          selectedColor={selectedColor}
+          tool={tool}
+          onSelectColor={onSelectColor}
+          onSelectTool={onSelectTool}
+        />
 
-      <button
-        type="button"
-        className={charging ? "toolBtn toolBtnPrimary toolBtnLoading" : "toolBtn toolBtnPrimary"}
-        aria-label="clean and arm"
-        onClick={onMop}
-      >
-        <MopIcon />
-        {charging && <span className="spinnerRing" aria-hidden="true" />}
-        {hasError && <span className="errorDot" aria-hidden="true" />}
-      </button>
+        <button
+          type="button"
+          className={charging ? "toolBtn toolBtnPrimary toolBtnLoading" : "toolBtn toolBtnPrimary"}
+          aria-label="clean and arm"
+          onClick={onMop}
+        >
+          <MopIcon />
+          {charging && <span className="spinnerRing" aria-hidden="true" />}
+          {hasError && <span className="errorDot" aria-hidden="true" />}
+        </button>
+      </div>
     </div>
   );
 }
