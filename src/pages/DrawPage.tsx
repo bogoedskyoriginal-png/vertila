@@ -63,7 +63,7 @@ export function DrawPage() {
         if (cancelled) return;
         setRemoteError(
           e instanceof Error && e.message === "API 404"
-            ? "Такой страницы не существует (ID не создан в мастер‑админке)."
+            ? "Страница не найдена."
             : e instanceof Error
               ? e.message
               : "load_failed"
@@ -87,18 +87,15 @@ export function DrawPage() {
     };
   }, []);
 
-  // Apply prediction drawing on preview/lock. If a second swing happens, replace the first prediction cleanly.
   useEffect(() => {
     async function apply() {
       if (!canvasApi) return;
       if (!motion.result) return;
-
       if (motion.state !== "preview" && motion.state !== "locked") return;
 
       const predId = Number(motion.result.predictionId);
       if (lastPredictionIdRef.current === predId) return;
 
-      // Snapshot before the first prediction to allow clean replacement on swing #2.
       if (!baseSnapshotRef.current) {
         baseSnapshotRef.current = canvasApi.exportDataUrl() ?? null;
       } else {
@@ -126,10 +123,6 @@ export function DrawPage() {
           <div className="card" style={{ padding: 14, borderRadius: 16 }}>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>Ошибка</div>
             <div className="hint">{remoteError}</div>
-            <div className="hint" style={{ marginTop: 10 }}>
-              Если вы ожидаете, что эта страница должна работать — сначала создайте ID в мастер‑админке и откройте ссылку
-              фокусника <span className="kbd">/{code}/admin</span>.
-            </div>
           </div>
         </div>
       );
@@ -140,7 +133,6 @@ export function DrawPage() {
         <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
           <div className="card" style={{ padding: 14, borderRadius: 16 }}>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>Загрузка…</div>
-            <div className="hint">Подготовка страницы…</div>
           </div>
         </div>
       );
@@ -156,11 +148,7 @@ export function DrawPage() {
   return (
     <div className="page appFullHeight">
       <div className="spectatorLayout">
-        {/* No verbal instructions on spectator view */}
-
-        <div
-          className="spectatorCanvasWrap"
-        >
+        <div className="spectatorCanvasWrap">
           <DrawingCanvas
             color={color}
             tool={tool}
@@ -213,3 +201,4 @@ export function DrawPage() {
     </div>
   );
 }
+

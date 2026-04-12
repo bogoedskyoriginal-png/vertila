@@ -208,8 +208,8 @@ export function useDrawingCanvas({
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.floor(width * dpr));
     canvas.height = Math.max(1, Math.floor(height * dpr));
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    // Keep CSS sizing driven by layout (e.g. width/height: 100%). Setting inline
+    // px sizes here can fight flex/aspect-ratio layouts and cause stretch artifacts.
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";

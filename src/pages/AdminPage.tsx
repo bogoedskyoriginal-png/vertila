@@ -7,8 +7,6 @@ import type { UserConfigResponse } from "../types/api";
 import { PredictionThumbnail } from "../components/PredictionThumbnail";
 import { PredictionEditorModal } from "../components/PredictionEditorModal";
 
-const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
-
 function normalizeCode(code: string | undefined) {
   return String(code || "").trim().toUpperCase();
 }
@@ -33,16 +31,7 @@ function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: P
   };
 }
 
-function clearPrediction(config: AppConfig, id: PredictionId): AppConfig {
-  return {
-    ...config,
-    predictions: config.predictions.map((p) =>
-      p.id === id ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 9 / 16, strokes: [] } } : p
-    )
-  };
-}
-
-function labelRuForId(id: PredictionId) {
+function labelForId(id: PredictionId) {
   if (id === 1) return "ВЕРХ (медленно)";
   if (id === 2) return "ПРАВО (медленно)";
   if (id === 3) return "НИЗ (медленно)";
@@ -109,22 +98,13 @@ export function AdminPage() {
 
     return (
       <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
-              Редактировать
-            </button>
-            <button
-              className="btn"
-              onClick={() => setRemote((prev) => clearPrediction(prev ?? DEFAULT_CONFIG, id))}
-              style={{ padding: "6px 10px", minHeight: 38 }}
-            >
-              Очистить
-            </button>
-          </div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelForId(id)}</div>
+          <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
+            Редактировать
+          </button>
         </div>
-        <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} height={170} />
+        <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
       </div>
     );
   }
@@ -145,7 +125,7 @@ export function AdminPage() {
           <div>
             <div style={{ fontSize: 18, fontWeight: 900 }}>Админка фокусника</div>
             <div className="hint">
-              Код: <span className="kbd">{code}</span>
+              ID: <span className="kbd">{code}</span>
             </div>
           </div>
 
@@ -166,11 +146,7 @@ export function AdminPage() {
           </div>
         </div>
 
-        {remoteError && (
-          <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 700 }}>
-            {remoteError} Откройте правильную ссылку вида <span className="kbd">/12345/admin</span> (и убедитесь, что ID создан в мастер‑админке).
-          </div>
-        )}
+        {remoteError && <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 700 }}>{remoteError}</div>}
       </div>
 
       <div className="card" style={{ padding: 14, borderRadius: 16 }}>
@@ -215,38 +191,13 @@ export function AdminPage() {
             {saving ? "Сохранение…" : "Применить изменения"}
           </button>
 
-          <button
-            className="btn"
-            disabled={saving || !!remoteError}
-            onClick={() => {
-              setRemote((prev) => {
-                const base = prev ?? DEFAULT_CONFIG;
-                const ids = predictionIdsForMode(base.mode);
-                return {
-                  ...base,
-                  predictions: base.predictions.map((p) =>
-                    ids.includes(p.id as any)
-                      ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 9 / 16, strokes: [] } }
-                      : p
-                  )
-                };
-              });
-            }}
-          >
-            Очистить все
-          </button>
-
           {savedAt && <div className="hint">Сохранено: {new Date(savedAt).toLocaleTimeString()}</div>}
-        </div>
-
-        <div className="hint" style={{ marginTop: 10 }}>
-          Дальше: откройте зрительскую ссылку <span className="kbd">/{code}</span> и нажмите кнопку швабры (очистка/зарядка).
         </div>
       </div>
 
       <PredictionEditorModal
         open={openEditor !== null}
-        title={openEditor ? labelRuForId(openEditor) : ""}
+        title={openEditor ? labelForId(openEditor) : ""}
         initial={
           openEditor
             ? (config.predictions.find((p) => p.id === openEditor)?.drawing ?? { v: 1, aspect: 9 / 16, strokes: [] })
@@ -256,11 +207,7 @@ export function AdminPage() {
         onSave={(drawing, imageDataUrl) => {
           if (!openEditor) return;
           setRemote((prev) =>
-            updatePredictionDrawing(
-              updatePredictionImage(prev ?? DEFAULT_CONFIG, openEditor, imageDataUrl),
-              openEditor,
-              drawing
-            )
+            updatePredictionDrawing(updatePredictionImage(prev ?? DEFAULT_CONFIG, openEditor, imageDataUrl), openEditor, drawing)
           );
           setOpenEditor(null);
         }}
@@ -268,3 +215,4 @@ export function AdminPage() {
     </div>
   );
 }
+

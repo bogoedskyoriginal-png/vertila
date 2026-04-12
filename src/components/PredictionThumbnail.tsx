@@ -5,10 +5,10 @@ import type { PredictionDrawing } from "../types/config";
 type Props = {
   drawing: PredictionDrawing | null | undefined;
   imageDataUrl?: string;
-  height?: number;
+  maxHeight?: number;
 };
 
-export function PredictionThumbnail({ drawing, imageDataUrl, height = 140 }: Props) {
+export function PredictionThumbnail({ drawing, imageDataUrl, maxHeight = 220 }: Props) {
   const { canvasRef, clear, drawStrokes, drawFromDataUrl } = useDrawingCanvas({
     color: "#111827",
     tool: "pen",
@@ -34,7 +34,7 @@ export function PredictionThumbnail({ drawing, imageDataUrl, height = 140 }: Pro
       style={{
         width: "100%",
         aspectRatio: "9 / 16",
-        height,
+        maxHeight,
         borderRadius: 12,
         overflow: "hidden",
         border: "1px solid rgba(0,0,0,0.08)",
@@ -48,4 +48,3 @@ export function PredictionThumbnail({ drawing, imageDataUrl, height = 140 }: Pro
     </div>
   );
 }
-

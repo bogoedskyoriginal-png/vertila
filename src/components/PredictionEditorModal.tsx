@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { DrawingCanvas } from "./DrawingCanvas";
 import type { DrawingCanvasApi } from "./DrawingCanvas";
 import type { DrawingTool } from "../hooks/useDrawingCanvas";
 import type { DrawingStroke, PredictionDrawing } from "../types/config";
-import { SpectatorToolbar } from "./SpectatorToolbar";
+import { PaletteToolbar } from "./PaletteToolbar";
 
 const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
 
@@ -30,21 +30,21 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
     if (!open) return;
     setTool("pen");
     setColor(COLORS[0]);
-    setDraft(initial);
+    setDraft({ ...initial, aspect: initial.aspect ?? 9 / 16 });
   }, [initial, open]);
 
   useEffect(() => {
     if (!open) return;
     if (!api) return;
-    const d = draft;
+    // Draw once on open; don't redraw after every stroke to avoid any resize/fit artifacts.
+    const d = initial;
     if (d && d.v === 1 && Array.isArray(d.strokes) && d.strokes.length > 0) {
-      api.drawStrokes(d, { clear: true, fit: "cover" }).catch(() => undefined);
+      api.drawStrokes({ ...d, aspect: d.aspect ?? 9 / 16 }, { clear: true, fit: "cover" }).catch(() => undefined);
     } else {
       api.clear();
     }
-  }, [api, draft, open]);
+  }, [api, initial, open]);
 
-  const hasStrokes = useMemo(() => (Array.isArray(draft?.strokes) ? draft.strokes.length > 0 : false), [draft]);
   if (!open) return null;
 
   return (
@@ -68,7 +68,7 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
         className="card"
         style={{
           height: "100%",
-          maxWidth: 720,
+          maxWidth: 760,
           margin: "0 auto",
           borderRadius: 18,
           overflow: "hidden",
@@ -105,42 +105,62 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
         </div>
 
         <div style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}>
-          <div className="spectatorCanvasWrap" style={{ height: "100%", borderRadius: 0, border: "none", boxShadow: "none" }}>
-            <DrawingCanvas
-              color={color}
-              tool={tool}
-              onReady={setApi}
-              className=""
-              style={{ border: "none", boxShadow: "none", borderRadius: 0 }}
-              onStrokeComplete={(stroke) => {
-                setDraft((prev) => {
-                  const aspect = prev.aspect ?? 9 / 16;
-                  return pushStroke({ ...prev, aspect }, stroke);
-                });
-              }}
-            />
-          </div>
-
-          <SpectatorToolbar
-            colors={COLORS}
-            selectedColor={color}
-            tool={tool}
-            onSelectColor={setColor}
-            onSelectTool={setTool}
-            charging={false}
-            hasError={false}
-            onMop={() => {
-              api?.clear();
-              setDraft({ v: 1, aspect: draft.aspect ?? 9 / 16, strokes: [] });
+          <div
+            style={{
+              height: "100%",
+              display: "grid",
+              placeItems: "center",
+              padding: "18px 12px",
+              boxSizing: "border-box"
             }}
-          />
-
-          {/* non-verbal hint: show subtle flash on clear */}
-          {!hasStrokes && (
-            <div style={{ position: "absolute", left: 12, top: 12, opacity: 0.25, fontSize: 12, pointerEvents: "none" }}>
-              {/* intentionally empty */}
+          >
+            {/* Phone-like vertical viewport */}
+            <div
+              style={{
+                width: "min(420px, 100%)",
+                aspectRatio: "9 / 16",
+                maxHeight: "78vh",
+                borderRadius: 24,
+                overflow: "hidden",
+                border: "1px solid rgba(17,24,39,0.10)",
+                boxShadow: "0 14px 30px rgba(0,0,0,0.14)",
+                background: "#fff",
+                display: "flex",
+                flexDirection: "column"
+              }}
+            >
+              <div style={{ flex: "1 1 auto", minHeight: 0 }}>
+                <DrawingCanvas
+                  color={color}
+                  tool={tool}
+                  onReady={setApi}
+                  className=""
+                  style={{ border: "none", boxShadow: "none", borderRadius: 0 }}
+                  onStrokeComplete={(stroke) => {
+                    setDraft((prev) => {
+                      const aspect = prev.aspect ?? 9 / 16;
+                      return pushStroke({ ...prev, aspect }, stroke);
+                    });
+                  }}
+                />
+              </div>
+              <div
+                style={{
+                  padding: 10,
+                  background: "rgba(255,255,255,0.92)",
+                  borderTop: "1px solid rgba(17,24,39,0.08)"
+                }}
+              >
+                <PaletteToolbar
+                  colors={COLORS}
+                  selectedColor={color}
+                  tool={tool}
+                  onSelectColor={setColor}
+                  onSelectTool={setTool}
+                />
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
