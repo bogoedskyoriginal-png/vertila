@@ -78,6 +78,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
   const baselineRef = useRef<Baseline | null>(null);
   const samplesRef = useRef<MotionSample[]>([]);
+  const initialWindowRef = useRef<MotionSample[]>([]);
   const lastEventAtRef = useRef<number>(0);
 
   const armedAtRef = useRef<number>(0);
@@ -132,6 +133,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
           motionEndCandidateRef.current = null;
           peakDeltaRef.current = delta;
           samplesRef.current = [{ t, x, y, z }];
+          initialWindowRef.current = [{ t, x, y, z }];
           setState("detecting");
         }
         return;
@@ -139,6 +141,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
       if (st === "detecting") {
         samplesRef.current.push({ t, x, y, z });
+        const startedAtForWindow = motionStartRef.current ?? t;
+        if (t - startedAtForWindow <= 220) {
+          initialWindowRef.current.push({ t, x, y, z });
+        }
         peakDeltaRef.current = Math.max(peakDeltaRef.current, delta);
 
         const quietThreshold = motionThreshold * 0.6;
@@ -156,7 +162,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         if (!quietLongEnough && !maxWindowReached) return;
 
         const durationMs = Math.max(1, Math.round(t - startedAt));
-        const mean = meanSample(samplesRef.current);
+        // Direction: use the first ~200ms window of the motion. Using the whole window often biases toward "bottom".
+        const directionSamples =
+          initialWindowRef.current.length >= 3 ? initialWindowRef.current : samplesRef.current;
+        const mean = meanSample(directionSamples);
         const dxAvg = mean.x - baseline.x;
         const dyAvg = mean.y - baseline.y;
 
@@ -187,6 +196,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
   const calibrate = useCallback(() => {
     samplesRef.current = [];
+    initialWindowRef.current = [];
     baselineRef.current = null;
     lockedRef.current = false;
     setResult(null);
@@ -201,6 +211,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       const base = meanSample(samplesRef.current);
       baselineRef.current = base;
       samplesRef.current = [];
+      initialWindowRef.current = [];
       motionStartRef.current = null;
       motionEndCandidateRef.current = null;
       peakDeltaRef.current = 0;
@@ -262,6 +273,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     setResult(null);
     baselineRef.current = null;
     samplesRef.current = [];
+    initialWindowRef.current = [];
     motionStartRef.current = null;
     motionEndCandidateRef.current = null;
     peakDeltaRef.current = 0;
