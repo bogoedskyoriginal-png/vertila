@@ -178,6 +178,40 @@ export function AdminPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
             <div className="card" style={{ padding: 12, borderRadius: 16 }}>
               <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
+                Тип предсказаний
+              </div>
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={outputMode === "drawings" ? "segBtn segBtnActive" : "segBtn"}
+                  disabled={!!remoteError}
+                  onClick={() =>
+                    setRemote((prev) => {
+                      const base = prev ?? DEFAULT_CONFIG;
+                      return { ...base, outputMode: "drawings" };
+                    })
+                  }
+                >
+                  Рисунки
+                </button>
+                <button
+                  type="button"
+                  className={outputMode === "links" ? "segBtn segBtnActive" : "segBtn"}
+                  disabled={!!remoteError}
+                  onClick={() =>
+                    setRemote((prev) => {
+                      const base = prev ?? DEFAULT_CONFIG;
+                      return { ...base, outputMode: "links", motion: { ...base.motion, mode8Strategy: "tilts" } };
+                    })
+                  }
+                >
+                  Ссылки
+                </button>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+              <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
                 Количество предсказаний
               </div>
               <div className="segmented">
