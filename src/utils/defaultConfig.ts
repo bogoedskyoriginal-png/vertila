@@ -25,7 +25,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     id,
     label: labelFor(id),
     imageDataUrl: "",
-    drawing: { v: 1, aspect: 4 / 3, strokes: [] }
+    drawing: { v: 1, aspect: 9 / 16, strokes: [] }
   })),
   motion: {
     countdownSeconds: 5,

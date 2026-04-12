@@ -28,10 +28,6 @@ function findPredictionDrawing(config: AppConfig, id: PredictionId): PredictionD
   return null;
 }
 
-function isDoubleTap(lastTapAt: number, now: number) {
-  return now - lastTapAt <= 260;
-}
-
 export function DrawPage() {
   const params = useParams();
   const code = normalizeCode(params.code);
@@ -47,9 +43,9 @@ export function DrawPage() {
   const config = remoteConfig ?? DEFAULT_CONFIG;
   const motion = useMotionClassifier(config);
 
-  const lastTapAtRef = useRef<number>(0);
   const baseSnapshotRef = useRef<string | null>(null);
   const lastPredictionIdRef = useRef<number | null>(null);
+  const [flash, setFlash] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +108,7 @@ export function DrawPage() {
 
       const drawing = findPredictionDrawing(config, motion.result.predictionId);
       if (drawing) {
-        await canvasApi.drawStrokes(drawing, { clear: false });
+        await canvasApi.drawStrokes(drawing, { clear: false, fit: "cover" });
         return;
       }
 
@@ -155,37 +151,15 @@ export function DrawPage() {
 
   if (spectatorUi) return spectatorUi;
 
+  const charging = motion.state === "countdown" || motion.state === "calibrating";
+
   return (
     <div className="page appFullHeight">
       <div className="spectatorLayout">
-        {motion.permissionError && (
-          <div className="card" style={{ padding: 12, borderColor: "rgba(185,28,28,0.25)" }}>
-            <div style={{ fontWeight: 900, color: "#b91c1c", marginBottom: 4 }}>Не удалось включить датчики</div>
-            <div className="hint">{motion.permissionError}</div>
-          </div>
-        )}
-
-        <SpectatorToolbar
-          colors={COLORS}
-          selectedColor={color}
-          tool={tool}
-          onSelectColor={setColor}
-          onSelectTool={setTool}
-        />
+        {/* No verbal instructions on spectator view */}
 
         <div
           className="spectatorCanvasWrap"
-          onPointerDown={() => {
-            const now = Date.now();
-            if (isDoubleTap(lastTapAtRef.current, now)) {
-              lastTapAtRef.current = 0;
-              baseSnapshotRef.current = null;
-              lastPredictionIdRef.current = null;
-              void motion.arm();
-            } else {
-              lastTapAtRef.current = now;
-            }
-          }}
         >
           <DrawingCanvas
             color={color}
@@ -196,21 +170,45 @@ export function DrawPage() {
           />
         </div>
 
-        <div className="spectatorBottomBar">
-          <button
-            className="btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              baseSnapshotRef.current = null;
-              lastPredictionIdRef.current = null;
-              void motion.arm();
-            }}
-            style={{ width: "100%", justifyContent: "center", fontWeight: 900, borderRadius: 18 }}
-          >
-            Очистить
-          </button>
-        </div>
+        <SpectatorToolbar
+          colors={COLORS}
+          selectedColor={color}
+          tool={tool}
+          onSelectColor={setColor}
+          onSelectTool={setTool}
+          charging={charging}
+          hasError={!!motion.permissionError}
+          onMop={() => {
+            baseSnapshotRef.current = null;
+            lastPredictionIdRef.current = null;
+            canvasApi?.clear();
+            setFlash((v) => v + 1);
+            void motion.arm();
+          }}
+        />
+
+        {flash > 0 && (
+          <div key={flash} className="spectatorFlash" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26">
+              <path
+                d="M14 3l7 7-2 2-7-7 2-2Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M3 21h10l7-7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        )}
       </div>
     </div>
   );

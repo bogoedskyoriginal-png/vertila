@@ -212,6 +212,16 @@ textarea {
   backdrop-filter: blur(10px);
 }
 
+.spectatorBarBottom {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  max-width: 720px;
+  margin: 0 auto;
+  z-index: 20;
+}
+
 .spectatorTools {
   display: flex;
   gap: 8px;
@@ -228,12 +238,52 @@ textarea {
   place-items: center;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
 
 .toolBtnActive {
   background: #111827;
   color: #fff;
   border-color: rgba(0, 0, 0, 0.12);
+}
+
+.toolBtnPrimary {
+  background: #111827;
+  color: #fff;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.toolBtnLoading {
+  opacity: 0.95;
+}
+
+.spinnerRing {
+  position: absolute;
+  inset: -4px;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.85);
+  animation: spin 0.9s linear infinite;
+}
+
+.errorDot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.9);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spectatorColors {
@@ -269,10 +319,38 @@ textarea {
 }
 
 .spectatorBottomBar {
+  display: none;
+}
+
+.spectatorFlash {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  max-width: 720px;
-  margin: 0 auto;
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: rgba(17, 24, 39, 0.9);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+  z-index: 30;
+  animation: flash 650ms ease-out both;
+  pointer-events: none;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
 }

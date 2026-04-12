@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import type { DrawingTool } from "../hooks/useDrawingCanvas";
+import type { DrawingStroke, PredictionDrawing } from "../types/config";
 
 export type DrawingCanvasApi = {
   clear: () => void;
   exportDataUrl: () => string | null;
-  drawStrokes: (drawing: import("../types/config").PredictionDrawing, opts?: { clear?: boolean }) => Promise<void>;
+  drawStrokes: (drawing: PredictionDrawing, opts?: { clear?: boolean; fit?: "contain" | "cover" }) => Promise<void>;
   drawFromDataUrl: (dataUrl: string, opts?: { clear?: boolean }) => Promise<void>;
 };
 
@@ -18,6 +19,7 @@ type Props = {
   style?: React.CSSProperties;
   onReady?: (api: DrawingCanvasApi) => void;
   onStrokeEnd?: () => void;
+  onStrokeComplete?: (stroke: DrawingStroke) => void;
 };
 
 export function DrawingCanvas({
@@ -28,13 +30,15 @@ export function DrawingCanvas({
   className,
   style,
   onReady,
-  onStrokeEnd
+  onStrokeEnd,
+  onStrokeComplete
 }: Props) {
   const { canvasRef, bindPointerHandlers, clear, exportDataUrl, drawStrokes, drawFromDataUrl } = useDrawingCanvas({
     color,
     tool,
     lineWidth,
-    eraserWidth
+    eraserWidth,
+    onStrokeComplete
   });
 
   useEffect(() => {

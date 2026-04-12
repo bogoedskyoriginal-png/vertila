@@ -86,7 +86,7 @@ function normalizeConfig(input) {
           id: base.id,
           label: base.label,
           imageDataUrl: String(prev?.imageDataUrl || ""),
-          drawing: { v: 1, aspect: 4 / 3, strokes: [] }
+          drawing: { v: 1, aspect: 9 / 16, strokes: [] }
         };
       }),
       motion: {
@@ -117,7 +117,7 @@ function normalizeConfig(input) {
         drawing:
           prevDrawing && prevDrawing.v === 1 && Array.isArray(prevDrawing.strokes)
             ? prevDrawing
-            : { v: 1, aspect: 4 / 3, strokes: [] }
+            : { v: 1, aspect: 9 / 16, strokes: [] }
       };
     }),
     motion: {

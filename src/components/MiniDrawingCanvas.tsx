@@ -54,7 +54,7 @@ export function MiniDrawingCanvas({ value, drawing, color, tool, onChange, onDra
     <div
       style={{
         width: "100%",
-        aspectRatio: "4 / 3",
+        aspectRatio: "9 / 16",
         minHeight: height,
         borderRadius: 12,
         overflow: "hidden",

@@ -22,7 +22,7 @@ export const DEFAULT_CONFIG = {
                     ? "Bottom (fast)"
                     : "Left (fast)",
     imageDataUrl: "",
-    drawing: { v: 1, aspect: 4 / 3, strokes: [] }
+    drawing: { v: 1, aspect: 9 / 16, strokes: [] }
   })),
   motion: {
     countdownSeconds: 5,

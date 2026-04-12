@@ -86,7 +86,8 @@ export function useDrawingCanvas({
     }
   }, []);
 
-  const drawStrokes = useCallback(async (drawing: PredictionDrawing, opts?: { clear?: boolean }) => {
+  const drawStrokes = useCallback(
+    async (drawing: PredictionDrawing, opts?: { clear?: boolean; fit?: "contain" | "cover" }) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -110,16 +111,28 @@ export function useDrawingCanvas({
     let targetH = canvas.height;
     let offX = 0;
     let offY = 0;
-    if (canvasAspect > aspect) {
-      targetH = canvas.height;
-      targetW = targetH * aspect;
-      offX = (canvas.width - targetW) / 2;
+    const fit = opts?.fit ?? "contain";
+    if (fit === "cover") {
+      if (canvasAspect > aspect) {
+        targetW = canvas.width;
+        targetH = targetW / aspect;
+        offY = (canvas.height - targetH) / 2;
+      } else {
+        targetH = canvas.height;
+        targetW = targetH * aspect;
+        offX = (canvas.width - targetW) / 2;
+      }
     } else {
-      targetW = canvas.width;
-      targetH = targetW / aspect;
-      offY = (canvas.height - targetH) / 2;
+      if (canvasAspect > aspect) {
+        targetH = canvas.height;
+        targetW = targetH * aspect;
+        offX = (canvas.width - targetW) / 2;
+      } else {
+        targetW = canvas.width;
+        targetH = targetW / aspect;
+        offY = (canvas.height - targetH) / 2;
+      }
     }
-    const scale = Math.min(targetW / canvas.width, targetH / canvas.height);
 
     for (const s of strokes) {
       const pts = Array.isArray(s?.points) ? s.points : [];
@@ -130,11 +143,11 @@ export function useDrawingCanvas({
       if (s.tool === "eraser") {
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "rgba(0,0,0,1)";
-        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr * scale;
+        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
       } else {
         ctx.globalCompositeOperation = "source-over";
         ctx.strokeStyle = String(s.color || "#111827");
-        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr * scale;
+        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
       }
 
       ctx.beginPath();
@@ -144,7 +157,9 @@ export function useDrawingCanvas({
       }
       ctx.stroke();
     }
-  }, []);
+    },
+    []
+  );
 
   const drawFromDataUrl = useCallback(async (dataUrl: string, opts?: { clear?: boolean }) => {
     const canvas = canvasRef.current;

@@ -4,9 +4,8 @@ import type { AppConfig, AppMode, PredictionDrawing, PredictionId } from "../typ
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
-import { Toolbar } from "../components/Toolbar";
-import type { DrawingTool } from "../hooks/useDrawingCanvas";
-import { MiniDrawingCanvas } from "../components/MiniDrawingCanvas";
+import { PredictionThumbnail } from "../components/PredictionThumbnail";
+import { PredictionEditorModal } from "../components/PredictionEditorModal";
 
 const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
 
@@ -29,7 +28,7 @@ function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: P
   return {
     ...config,
     predictions: config.predictions.map((p) =>
-      p.id === id ? { ...p, drawing: { ...drawing, aspect: drawing.aspect ?? p.drawing?.aspect ?? 4 / 3 } } : p
+      p.id === id ? { ...p, drawing: { ...drawing, aspect: drawing.aspect ?? p.drawing?.aspect ?? 9 / 16 } } : p
     )
   };
 }
@@ -38,7 +37,7 @@ function clearPrediction(config: AppConfig, id: PredictionId): AppConfig {
   return {
     ...config,
     predictions: config.predictions.map((p) =>
-      p.id === id ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 4 / 3, strokes: [] } } : p
+      p.id === id ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 9 / 16, strokes: [] } } : p
     )
   };
 }
@@ -62,9 +61,7 @@ export function AdminPage() {
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-
-  const [color, setColor] = useState(COLORS[0]);
-  const [tool, setTool] = useState<DrawingTool>("pen");
+  const [openEditor, setOpenEditor] = useState<PredictionId | null>(null);
 
   const config = remote ?? DEFAULT_CONFIG;
   const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
@@ -114,24 +111,20 @@ export function AdminPage() {
       <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
           <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
-          <button
-            className="btn"
-            onClick={() => setRemote((prev) => clearPrediction(prev ?? DEFAULT_CONFIG, id))}
-            style={{ padding: "6px 10px", minHeight: 38 }}
-          >
-            Очистить
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
+              Редактировать
+            </button>
+            <button
+              className="btn"
+              onClick={() => setRemote((prev) => clearPrediction(prev ?? DEFAULT_CONFIG, id))}
+              style={{ padding: "6px 10px", minHeight: 38 }}
+            >
+              Очистить
+            </button>
+          </div>
         </div>
-
-        <MiniDrawingCanvas
-          value={p.imageDataUrl}
-          drawing={p.drawing ?? { v: 1, aspect: 4 / 3, strokes: [] }}
-          color={color}
-          tool={tool}
-          onChange={(dataUrl) => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, dataUrl))}
-          onDrawingChange={(drawing) => setRemote((prev) => updatePredictionDrawing(prev ?? DEFAULT_CONFIG, id, drawing))}
-          height={170}
-        />
+        <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} height={170} />
       </div>
     );
   }
@@ -180,8 +173,6 @@ export function AdminPage() {
         )}
       </div>
 
-      <Toolbar colors={COLORS} selectedColor={color} tool={tool} onSelectColor={setColor} onSelectTool={setTool} />
-
       <div className="card" style={{ padding: 14, borderRadius: 16 }}>
         <div style={{ fontWeight: 900, marginBottom: 12 }}>Предсказания (рисунки)</div>
 
@@ -209,8 +200,8 @@ export function AdminPage() {
                       imageDataUrl: String(prev?.imageDataUrl || ""),
                       drawing:
                         prev?.drawing && prev.drawing.v === 1
-                          ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 4 / 3 }
-                          : { v: 1, aspect: 4 / 3, strokes: [] }
+                          ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
+                          : { v: 1, aspect: 9 / 16, strokes: [] }
                     };
                   })
                 };
@@ -234,7 +225,9 @@ export function AdminPage() {
                 return {
                   ...base,
                   predictions: base.predictions.map((p) =>
-                    ids.includes(p.id as any) ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 4 / 3, strokes: [] } } : p
+                    ids.includes(p.id as any)
+                      ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 9 / 16, strokes: [] } }
+                      : p
                   )
                 };
               });
@@ -247,9 +240,31 @@ export function AdminPage() {
         </div>
 
         <div className="hint" style={{ marginTop: 10 }}>
-          Дальше: откройте зрительскую ссылку <span className="kbd">/{code}</span>, сделайте двойной быстрый тап по экрану, положите телефон экраном вниз и переворачивайте через нужный край.
+          Дальше: откройте зрительскую ссылку <span className="kbd">/{code}</span> и нажмите кнопку швабры (очистка/зарядка).
         </div>
       </div>
+
+      <PredictionEditorModal
+        open={openEditor !== null}
+        title={openEditor ? labelRuForId(openEditor) : ""}
+        initial={
+          openEditor
+            ? (config.predictions.find((p) => p.id === openEditor)?.drawing ?? { v: 1, aspect: 9 / 16, strokes: [] })
+            : { v: 1, aspect: 9 / 16, strokes: [] }
+        }
+        onClose={() => setOpenEditor(null)}
+        onSave={(drawing, imageDataUrl) => {
+          if (!openEditor) return;
+          setRemote((prev) =>
+            updatePredictionDrawing(
+              updatePredictionImage(prev ?? DEFAULT_CONFIG, openEditor, imageDataUrl),
+              openEditor,
+              drawing
+            )
+          );
+          setOpenEditor(null);
+        }}
+      />
     </div>
   );
 }
