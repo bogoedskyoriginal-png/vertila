@@ -34,6 +34,7 @@ export function MasterPage() {
   const [masterUser, setMasterUser] = useState(() => safeGetLs(LS_MASTER_USER) ?? "");
   const [masterPass, setMasterPass] = useState(() => safeGetLs(LS_MASTER_PASS) ?? "");
 
+  const [tab, setTab] = useState<"list" | "add">("list");
   const [newCode, setNewCode] = useState("");
   const [search, setSearch] = useState("");
 
@@ -163,88 +164,116 @@ export function MasterPage() {
       <div className="masterWrap">
         <div className="masterCard masterCardWide">
           <div className="masterTabs">
-            <div className="masterTab">Список пользователей</div>
-            <div className="masterTab">Добавить пользователя</div>
+            <button
+              type="button"
+              className={tab === "list" ? "masterTabBtn masterTabBtnActive" : "masterTabBtn"}
+              onClick={() => setTab("list")}
+            >
+              Список пользователей
+            </button>
+            <button
+              type="button"
+              className={tab === "add" ? "masterTabBtn masterTabBtnActive" : "masterTabBtn"}
+              onClick={() => setTab("add")}
+            >
+              Добавить пользователя
+            </button>
           </div>
 
           <div className="masterDivider" />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-            <input
-              value={newCode}
-              onChange={(e) => setNewCode(normalizeCodeInput(e.target.value))}
-              placeholder="Введите ID для создания ссылок"
-              maxLength={10}
-              className="masterInput"
-              style={{ fontFamily: "ui-monospace" }}
-            />
-            <div className="masterRow2">
-              <button
-                className="masterBtn"
-                disabled={busy}
-                onClick={() => {
-                  void createWithCode(null);
-                }}
-              >
-                Сгенерировать
-              </button>
-              <button
-                className="masterBtn masterBtnPrimary"
-                disabled={busy || !newCode.trim()}
-                onClick={() => {
-                  void createWithCode(newCode.trim().toUpperCase());
-                }}
-              >
-                Создать
-              </button>
-            </div>
-            <div className="masterCount">Пользователей: {users.length}</div>
-          </div>
+          {tab === "list" ? (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Поиск по ID"
+                  className="masterInput"
+                />
+                <button
+                  className="masterBtn masterBtnPrimary"
+                  disabled={busy}
+                  onClick={() => {
+                    void refresh();
+                  }}
+                >
+                  Обновить
+                </button>
+              </div>
+              {error && <div className="masterError">{error}</div>}
+              <div className="masterDivider" style={{ marginTop: 14 }} />
+            </>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
+                <input
+                  value={newCode}
+                  onChange={(e) => setNewCode(normalizeCodeInput(e.target.value))}
+                  placeholder="Введите ID для создания ссылок"
+                  maxLength={10}
+                  className="masterInput"
+                  style={{ fontFamily: "ui-monospace" }}
+                />
 
-          {links && (
-            <div style={{ marginTop: 14 }}>
-              <div className="masterDivider" />
-              <div className="masterSectionTitle" style={{ marginTop: 12 }}>
-                Ссылки
+                <div className="masterRow2">
+                  <button
+                    className="masterBtn"
+                    disabled={busy}
+                    onClick={() => {
+                      void createWithCode(null);
+                    }}
+                  >
+                    Сгенерировать
+                  </button>
+                  <button
+                    className="masterBtn masterBtnPrimary"
+                    disabled={busy || !newCode.trim()}
+                    onClick={() => {
+                      void createWithCode(newCode.trim().toUpperCase());
+                    }}
+                  >
+                    Создать
+                  </button>
+                </div>
               </div>
-              <div className="masterLinkRow">
-                <div className="masterLinkText">{links.spectator}</div>
-                <button className="masterBtn masterBtnSmall" onClick={() => navigator.clipboard.writeText(links.spectator)}>
-                  Копировать
-                </button>
+
+              {links && (
+                <div style={{ marginTop: 14 }}>
+                  <div className="masterDivider" />
+                  <div className="masterSectionTitle" style={{ marginTop: 12 }}>
+                    Ссылки
+                  </div>
+                  <div className="masterLinkRow">
+                    <div className="masterLinkText">{links.spectator}</div>
+                    <button
+                      className="masterBtn masterBtnSmall"
+                      onClick={() => navigator.clipboard.writeText(links.spectator)}
+                    >
+                      Копировать
+                    </button>
+                  </div>
+                  <div className="masterLinkRow">
+                    <div className="masterLinkText">{links.magician}</div>
+                    <button
+                      className="masterBtn masterBtnSmall"
+                      onClick={() => navigator.clipboard.writeText(links.magician)}
+                    >
+                      Копировать
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="masterCount" style={{ marginTop: 14 }}>
+                Пользователей: {users.length}
               </div>
-              <div className="masterLinkRow">
-                <div className="masterLinkText">{links.magician}</div>
-                <button className="masterBtn masterBtnSmall" onClick={() => navigator.clipboard.writeText(links.magician)}>
-                  Копировать
-                </button>
-              </div>
-            </div>
+
+              {error && <div className="masterError">{error}</div>}
+
+              <div className="masterDivider" style={{ marginTop: 14 }} />
+            </>
           )}
-
-          <div className="masterDivider" style={{ marginTop: 14 }} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по ID"
-              className="masterInput"
-            />
-            <button
-              className="masterBtn masterBtnPrimary"
-              disabled={busy}
-              onClick={() => {
-                void refresh();
-              }}
-            >
-              Обновить
-            </button>
-          </div>
-
-          {error && <div className="masterError">{error}</div>}
-
-          <div className="masterDivider" style={{ marginTop: 14 }} />
 
           <div className="masterUsers">
             {filtered.length === 0 ? (
@@ -298,4 +327,3 @@ export function MasterPage() {
     </div>
   );
 }
-

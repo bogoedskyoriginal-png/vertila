@@ -400,13 +400,22 @@ textarea {
   gap: 12px;
 }
 
-.masterTab {
+.masterTabBtn {
+  appearance: none;
+  -webkit-appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 14px;
   padding: 12px 14px;
   text-align: center;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.04);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.masterTabBtnActive {
+  background: #fff;
+  color: #050507;
 }
 
 .masterDivider {
