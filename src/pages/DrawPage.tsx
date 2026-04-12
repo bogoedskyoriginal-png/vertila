@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DrawingCanvas } from "../components/DrawingCanvas";
 import type { DrawingCanvasApi } from "../components/DrawingCanvas";
-import { Toolbar } from "../components/Toolbar";
 import type { DrawingTool } from "../hooks/useDrawingCanvas";
+import { SpectatorToolbar } from "../components/SpectatorToolbar";
 import { useMotionClassifier } from "../hooks/useMotionClassifier";
 import type { AppConfig, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
@@ -135,49 +135,46 @@ export function DrawPage() {
   if (spectatorUi) return spectatorUi;
 
   return (
-    <div className="page" style={{ maxWidth: 720, margin: "0 auto", paddingBottom: 84 }}>
-      {motion.permissionError && (
-        <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: "rgba(185,28,28,0.25)" }}>
-          <div style={{ fontWeight: 900, color: "#b91c1c", marginBottom: 4 }}>Не удалось включить датчики</div>
-          <div className="hint">{motion.permissionError}</div>
+    <div className="page appFullHeight">
+      <div className="spectatorLayout">
+        {motion.permissionError && (
+          <div className="card" style={{ padding: 12, borderColor: "rgba(185,28,28,0.25)" }}>
+            <div style={{ fontWeight: 900, color: "#b91c1c", marginBottom: 4 }}>Не удалось включить датчики</div>
+            <div className="hint">{motion.permissionError}</div>
+          </div>
+        )}
+
+        <SpectatorToolbar
+          colors={COLORS}
+          selectedColor={color}
+          tool={tool}
+          onSelectColor={setColor}
+          onSelectTool={setTool}
+        />
+
+        <div
+          className="spectatorCanvasWrap"
+          onPointerDown={() => {
+            const now = Date.now();
+            if (isDoubleTap(lastTapAtRef.current, now)) {
+              lastTapAtRef.current = 0;
+              revealAppliedRef.current = false;
+              void motion.arm();
+            } else {
+              lastTapAtRef.current = now;
+            }
+          }}
+        >
+          <DrawingCanvas
+            color={color}
+            tool={tool}
+            onReady={setCanvasApi}
+            className=""
+            style={{ border: "none", boxShadow: "none", borderRadius: 0 }}
+          />
         </div>
-      )}
 
-      <Toolbar
-        colors={COLORS}
-        selectedColor={color}
-        tool={tool}
-        onSelectColor={setColor}
-        onSelectTool={setTool}
-      />
-
-      <div
-        onPointerDown={() => {
-          const now = Date.now();
-          if (isDoubleTap(lastTapAtRef.current, now)) {
-            lastTapAtRef.current = 0;
-            revealAppliedRef.current = false;
-            void motion.arm();
-          } else {
-            lastTapAtRef.current = now;
-          }
-        }}
-      >
-        <DrawingCanvas color={color} tool={tool} onReady={setCanvasApi} />
-      </div>
-
-      {/* Fallback: iOS permission can be finicky; a clear-looking button triggers sensor enable on click */}
-      <div
-        style={{
-          position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          padding: 12,
-          background: "linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0.92), rgba(255,255,255,0))"
-        }}
-      >
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <div className="spectatorBottomBar">
           <button
             className="btn"
             onClick={(e) => {
@@ -186,7 +183,7 @@ export function DrawPage() {
               revealAppliedRef.current = false;
               void motion.arm();
             }}
-            style={{ width: "100%", justifyContent: "center", fontWeight: 900 }}
+            style={{ width: "100%", justifyContent: "center", fontWeight: 900, borderRadius: 18 }}
           >
             Очистить
           </button>

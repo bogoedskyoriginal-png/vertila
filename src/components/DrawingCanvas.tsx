@@ -46,7 +46,7 @@ export function DrawingCanvas({
       className={className ?? "card"}
       style={{
         width: "100%",
-        height: "calc(100vh - 24px - 64px)",
+        height: "100%",
         overflow: "hidden",
         touchAction: "none",
         ...(style ?? {})
