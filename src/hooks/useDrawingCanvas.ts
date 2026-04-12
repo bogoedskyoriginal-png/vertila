@@ -44,6 +44,7 @@ export function useDrawingCanvas({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
+  const pointsPxRef = useRef<Point[]>([]);
   const currentStrokeRef = useRef<DrawingStroke | null>(null);
 
   const applyStrokeStyle = useCallback(
@@ -51,6 +52,11 @@ export function useDrawingCanvas({
       const dpr = getCanvasDpr(ctx.canvas);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
+      // Stroke rendering is independent from image smoothing, but keeping it enabled
+      // helps when we later draw images onto the same canvas.
+      ctx.imageSmoothingEnabled = true;
+      // @ts-expect-error - older lib.dom.d.ts may not include this
+      ctx.imageSmoothingQuality = "high";
       if (tool === "eraser") {
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "rgba(0,0,0,1)";
@@ -73,6 +79,9 @@ export function useDrawingCanvas({
     if (!ctx) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
+    ctx.imageSmoothingEnabled = true;
+    // @ts-expect-error - older lib.dom.d.ts may not include this
+    ctx.imageSmoothingQuality = "high";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
@@ -96,6 +105,9 @@ export function useDrawingCanvas({
     if (opts?.clear !== false) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = "source-over";
+      ctx.imageSmoothingEnabled = true;
+      // @ts-expect-error - older lib.dom.d.ts may not include this
+      ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
@@ -140,6 +152,9 @@ export function useDrawingCanvas({
 
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
+      ctx.imageSmoothingEnabled = true;
+      // @ts-expect-error - older lib.dom.d.ts may not include this
+      ctx.imageSmoothingQuality = "high";
       if (s.tool === "eraser") {
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "rgba(0,0,0,1)";
@@ -180,6 +195,9 @@ export function useDrawingCanvas({
     if (opts?.clear !== false) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = "source-over";
+      ctx.imageSmoothingEnabled = true;
+      // @ts-expect-error - older lib.dom.d.ts may not include this
+      ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
@@ -190,6 +208,9 @@ export function useDrawingCanvas({
     const y = (canvas.height - h) / 2;
 
     ctx.globalCompositeOperation = "source-over";
+    ctx.imageSmoothingEnabled = true;
+    // @ts-expect-error - older lib.dom.d.ts may not include this
+    ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, x, y, w, h);
   }, []);
 
@@ -215,6 +236,9 @@ export function useDrawingCanvas({
     ctx.globalCompositeOperation = "source-over";
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    ctx.imageSmoothingEnabled = true;
+    // @ts-expect-error - older lib.dom.d.ts may not include this
+    ctx.imageSmoothingQuality = "high";
 
     if (prev.width > 0 && prev.height > 0) {
       ctx.drawImage(prev, 0, 0, prev.width, prev.height, 0, 0, canvas.width, canvas.height);
@@ -229,7 +253,9 @@ export function useDrawingCanvas({
       if (!ctx) return;
       isDrawingRef.current = true;
       applyStrokeStyle(ctx);
-      lastPointRef.current = getCanvasPoint(canvas, clientX, clientY);
+      const p = getCanvasPoint(canvas, clientX, clientY);
+      lastPointRef.current = p;
+      pointsPxRef.current = [p];
 
       const widthCss = tool === "eraser" ? eraserWidth : lineWidth;
       currentStrokeRef.current = {
@@ -249,19 +275,33 @@ export function useDrawingCanvas({
       if (!isDrawingRef.current) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const last = lastPointRef.current;
       const next = getCanvasPoint(canvas, clientX, clientY);
-      if (!last) {
-        lastPointRef.current = next;
-        return;
-      }
 
       applyStrokeStyle(ctx);
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(next.x, next.y);
-      ctx.stroke();
+      const pts = pointsPxRef.current;
+      pts.push(next);
       lastPointRef.current = next;
+
+      // Simple smoothing: draw quadratic curves between midpoints.
+      // This reduces jagged/pixelated vertical lines on lower event rates.
+      if (pts.length === 2) {
+        const a = pts[0];
+        const b = pts[1];
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      } else if (pts.length >= 3) {
+        const p1 = pts[pts.length - 3];
+        const p2 = pts[pts.length - 2];
+        const p3 = pts[pts.length - 1];
+        const mid1 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        const mid2 = { x: (p2.x + p3.x) / 2, y: (p2.y + p3.y) / 2 };
+        ctx.beginPath();
+        ctx.moveTo(mid1.x, mid1.y);
+        ctx.quadraticCurveTo(p2.x, p2.y, mid2.x, mid2.y);
+        ctx.stroke();
+      }
 
       const st = currentStrokeRef.current;
       if (st) {
@@ -278,6 +318,7 @@ export function useDrawingCanvas({
   const end = useCallback(() => {
     isDrawingRef.current = false;
     lastPointRef.current = null;
+    pointsPxRef.current = [];
     const st = currentStrokeRef.current;
     currentStrokeRef.current = null;
     if (st && st.points.length >= 2) onStrokeComplete?.(st);
@@ -290,8 +331,22 @@ export function useDrawingCanvas({
         start(e.clientX, e.clientY);
       },
       onPointerMove: (e: ReactPointerEvent) => move(e.clientX, e.clientY),
-      onPointerUp: () => end(),
-      onPointerCancel: () => end(),
+      onPointerUp: (e: ReactPointerEvent) => {
+        try {
+          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
+        end();
+      },
+      onPointerCancel: (e: ReactPointerEvent) => {
+        try {
+          (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
+        end();
+      },
       onPointerLeave: () => end()
     };
   }, [end, move, start]);

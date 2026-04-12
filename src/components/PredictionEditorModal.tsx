@@ -73,7 +73,10 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
           borderRadius: 18,
           overflow: "hidden",
           display: "flex",
-          flexDirection: "column"
+          flexDirection: "column",
+          background: "#07070b",
+          color: "#f8fafc",
+          border: "1px solid rgba(255,255,255,0.12)"
         }}
       >
         <div
@@ -83,25 +86,34 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
             justifyContent: "space-between",
             alignItems: "center",
             gap: 10,
-            borderBottom: "1px solid rgba(17,24,39,0.08)"
+            borderBottom: "1px solid rgba(255,255,255,0.10)"
           }}
         >
           <div style={{ fontWeight: 900 }}>{title}</div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn" onClick={onClose} style={{ minHeight: 44, borderRadius: 14 }}>
-              Закрыть
-            </button>
-            <button
-              className="btn btnPrimary"
-              onClick={() => {
-                const img = api?.exportDataUrl() ?? "";
-                onSave(draft, img);
-              }}
-              style={{ minHeight: 44, borderRadius: 14 }}
-            >
-              Сохранить
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={onClose}
+            aria-label="close"
+            style={{
+              minHeight: 42,
+              minWidth: 42,
+              padding: 0,
+              borderRadius: 14,
+              display: "grid",
+              placeItems: "center"
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
         </div>
 
         <div style={{ flex: "1 1 auto", minHeight: 0, position: "relative" }}>
@@ -122,8 +134,8 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
                 maxHeight: "78vh",
                 borderRadius: 24,
                 overflow: "hidden",
-                border: "1px solid rgba(17,24,39,0.10)",
-                boxShadow: "0 14px 30px rgba(0,0,0,0.14)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                boxShadow: "0 18px 44px rgba(0,0,0,0.55)",
                 background: "#fff",
                 display: "flex",
                 flexDirection: "column"
@@ -161,6 +173,26 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
               </div>
             </div>
           </div>
+        </div>
+
+        <div
+          style={{
+            padding: 12,
+            borderTop: "1px solid rgba(255,255,255,0.10)",
+            background: "rgba(7,7,11,0.92)"
+          }}
+        >
+          <button
+            type="button"
+            className="btn btnPrimary"
+            onClick={() => {
+              const img = api?.exportDataUrl() ?? "";
+              onSave(draft, img);
+            }}
+            style={{ width: "100%", minHeight: 46, borderRadius: 14 }}
+          >
+            Сохранить
+          </button>
         </div>
       </div>
     </div>
