@@ -41,16 +41,18 @@ function updatePredictionLinkQuery(config: AppConfig, id: PredictionId, linkQuer
 }
 
 function labelForId(id: PredictionId, strategy: "speed" | "tilts") {
-  // Intentionally keep magician-facing wording consistent between strategies.
-  // In "tilts" it literally means 1st/2nd tilt; in "speed" it maps slow/fast to the same labels.
-  if (id === 1) return "ВЕРХ (1 наклон)";
-  if (id === 2) return "ПРАВО (1 наклон)";
-  if (id === 3) return "НИЗ (1 наклон)";
-  if (id === 4) return "ЛЕВО (1 наклон)";
-  if (id === 5) return "ВЕРХ (2 наклона)";
-  if (id === 6) return "ПРАВО (2 наклона)";
-  if (id === 7) return "НИЗ (2 наклона)";
-  return "ЛЕВО (2 наклона)";
+  const isSecond = id >= 5;
+  const base = ((id - 1) % 4) + 1;
+
+  const dir =
+    base === 1 ? "ВЕРХ" : base === 2 ? "ПРАВО" : base === 3 ? "НИЗ" : "ЛЕВО";
+
+  if (strategy === "speed") {
+    return isSecond ? `${dir} (быстро)` : `${dir} (медленно)`;
+  }
+
+  // tilts strategy
+  return isSecond ? `${dir} (2 наклона)` : `${dir} (1 наклон)`;
 }
 export function AdminPage() {
   const params = useParams();
