@@ -28,7 +28,9 @@ function updatePredictionImage(config: AppConfig, id: PredictionId, imageDataUrl
 function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: PredictionDrawing): AppConfig {
   return {
     ...config,
-    predictions: config.predictions.map((p) => (p.id === id ? { ...p, drawing } : p))
+    predictions: config.predictions.map((p) =>
+      p.id === id ? { ...p, drawing: { ...drawing, aspect: drawing.aspect ?? p.drawing?.aspect ?? 4 / 3 } } : p
+    )
   };
 }
 
@@ -36,7 +38,7 @@ function clearPrediction(config: AppConfig, id: PredictionId): AppConfig {
   return {
     ...config,
     predictions: config.predictions.map((p) =>
-      p.id === id ? { ...p, imageDataUrl: "", drawing: { v: 1, strokes: [] } } : p
+      p.id === id ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 4 / 3, strokes: [] } } : p
     )
   };
 }
@@ -123,7 +125,7 @@ export function AdminPage() {
 
         <MiniDrawingCanvas
           value={p.imageDataUrl}
-          drawing={p.drawing ?? { v: 1, strokes: [] }}
+          drawing={p.drawing ?? { v: 1, aspect: 4 / 3, strokes: [] }}
           color={color}
           tool={tool}
           onChange={(dataUrl) => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, dataUrl))}
@@ -205,7 +207,10 @@ export function AdminPage() {
                     return {
                       ...base,
                       imageDataUrl: String(prev?.imageDataUrl || ""),
-                      drawing: prev?.drawing && prev.drawing.v === 1 ? prev.drawing : { v: 1, strokes: [] }
+                      drawing:
+                        prev?.drawing && prev.drawing.v === 1
+                          ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 4 / 3 }
+                          : { v: 1, aspect: 4 / 3, strokes: [] }
                     };
                   })
                 };
@@ -229,7 +234,7 @@ export function AdminPage() {
                 return {
                   ...base,
                   predictions: base.predictions.map((p) =>
-                    ids.includes(p.id as any) ? { ...p, imageDataUrl: "", drawing: { v: 1, strokes: [] } } : p
+                    ids.includes(p.id as any) ? { ...p, imageDataUrl: "", drawing: { v: 1, aspect: 4 / 3, strokes: [] } } : p
                   )
                 };
               });

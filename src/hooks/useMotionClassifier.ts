@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppConfig, Direction4, FlipSpeed, PredictionId } from "../types/config";
 import type { FlipResult, MotionFlowState, MotionSample } from "../types/motion";
-import { dominantDirection4, magnitude3, meanSample } from "../utils/motionMath";
+import { dominantDirection4, meanSample } from "../utils/motionMath";
 
 type Baseline = { x: number; y: number; z: number };
 
@@ -31,14 +31,13 @@ async function requestIosMotionPermission(): Promise<boolean> {
   const reqMotion = w.DeviceMotionEvent?.requestPermission as undefined | (() => Promise<"granted" | "denied">);
   const reqOrient = w.DeviceOrientationEvent?.requestPermission as undefined | (() => Promise<"granted" | "denied">);
 
-  // Some iOS versions are picky; try both permission APIs when present.
   try {
     if (typeof reqMotion === "function") {
       const r = await reqMotion();
       if (r === "granted") return true;
     }
   } catch {
-    // ignore, try orientation
+    // ignore
   }
 
   try {
@@ -61,6 +60,19 @@ function predictionIdFor(side: Direction4, speed: FlipSpeed, mode: 4 | 8): Predi
   return (speed === "fast" ? base + 4 : base) as PredictionId;
 }
 
+function clamp(v: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, v));
+}
+
+function normalize3(x: number, y: number, z: number) {
+  const m = Math.sqrt(x * x + y * y + z * z) || 1;
+  return { x: x / m, y: y / m, z: z / m };
+}
+
+function dot3(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
 export function useMotionClassifier(config: AppConfig): HookResult {
   const [state, setState] = useState<MotionFlowState>("idle");
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -77,20 +89,15 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   }, [config]);
 
   const baselineRef = useRef<Baseline | null>(null);
+  const baselineUnitRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const samplesRef = useRef<MotionSample[]>([]);
-  const initialWindowRef = useRef<MotionSample[]>([]);
   const lastEventAtRef = useRef<number>(0);
-
-  const armedAtRef = useRef<number>(0);
-  const calibrationCollectAfterRef = useRef<number>(0);
-  const motionStartRef = useRef<number | null>(null);
-  const motionEndCandidateRef = useRef<number | null>(null);
-  const peakDeltaRef = useRef<number>(0);
-  const peakCountRef = useRef<number>(0);
-  const aboveRef = useRef<boolean>(false);
 
   const listenerAttachedRef = useRef(false);
   const lockedRef = useRef(false);
+
+  const swingCountRef = useRef(0);
+  const inSwingRef = useRef(false);
 
   const countdownTimerRef = useRef<number | null>(null);
   const settleAndCalibrateTimerRef = useRef<number | null>(null);
@@ -102,110 +109,82 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     settleAndCalibrateTimerRef.current = null;
   }, []);
 
-  // stateRef is used inside the motion handler without re-attaching the listener.
   const stateRef = useRef<MotionFlowState>(state);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  const handler = useCallback(
-    (e: DeviceMotionEvent) => {
-      if (lockedRef.current) return;
-      const a = e.accelerationIncludingGravity;
-      if (!a) return;
+  const handler = useCallback((e: DeviceMotionEvent) => {
+    if (lockedRef.current) return;
 
-      // Keep a heartbeat even during countdown to avoid false "no events" errors.
-      lastEventAtRef.current = Date.now();
+    const a = e.accelerationIncludingGravity;
+    if (!a) return;
 
-      const st = stateRef.current;
-      if (st !== "calibrating" && st !== "armed" && st !== "detecting") return;
+    // heartbeat (even during countdown)
+    lastEventAtRef.current = Date.now();
 
-      const x = Number(a.x || 0);
-      const y = Number(a.y || 0);
-      const z = Number(a.z || 0);
-      const t = nowMs();
+    const st = stateRef.current;
+    if (st !== "calibrating" && st !== "armed" && st !== "preview") return;
 
-      if (st === "calibrating") {
-        if (t < calibrationCollectAfterRef.current) return;
-        samplesRef.current.push({ t, x, y, z });
-        return;
-      }
+    const x = Number(a.x || 0);
+    const y = Number(a.y || 0);
+    const z = Number(a.z || 0);
+    const t = nowMs();
 
-      const baseline = baselineRef.current;
-      if (!baseline) return;
-      const dx = x - baseline.x;
-      const dy = y - baseline.y;
-      const dz = z - baseline.z;
-      const delta = magnitude3(dx, dy, dz);
+    if (st === "calibrating") {
+      samplesRef.current.push({ t, x, y, z });
+      return;
+    }
 
-      const { motionThreshold } = configRef.current.motion;
+    const baseline = baselineRef.current;
+    const baseU = baselineUnitRef.current;
+    if (!baseline || !baseU) return;
 
-      if (st === "armed") {
-        if (delta >= motionThreshold) {
-          motionStartRef.current = t;
-          motionEndCandidateRef.current = null;
-          peakDeltaRef.current = delta;
-          peakCountRef.current = 0;
-          aboveRef.current = true;
-          samplesRef.current = [{ t, x, y, z }];
-          initialWindowRef.current = [{ t, x, y, z }];
-          setState("detecting");
-        }
-        return;
-      }
+    // Angle from baseline
+    const curU = normalize3(x, y, z);
+    const cos = clamp(dot3(baseU, curU), -1, 1);
+    const angleDeg = (Math.acos(cos) * 180) / Math.PI;
 
-      if (st === "detecting") {
-        samplesRef.current.push({ t, x, y, z });
-        const startedAtForWindow = motionStartRef.current ?? t;
-        if (t - startedAtForWindow <= 220) {
-          initialWindowRef.current.push({ t, x, y, z });
-        }
-        peakDeltaRef.current = Math.max(peakDeltaRef.current, delta);
+    // Full flip from baseline to opposite
+    const flipped = cos <= -0.85;
 
-        const quietThreshold = motionThreshold * 0.6;
-        // Count "peaks" above threshold (helps for 8-outcome mode if the performer does 2 quick shakes).
-        if (delta >= motionThreshold && !aboveRef.current) aboveRef.current = true;
-        if (delta < quietThreshold && aboveRef.current) {
-          aboveRef.current = false;
-          peakCountRef.current += 1;
-        }
-        if (delta < quietThreshold) {
-          if (!motionEndCandidateRef.current) motionEndCandidateRef.current = t;
-        } else {
-          motionEndCandidateRef.current = null;
-        }
+    // Direction: dominant delta in device x/y vs baseline
+    const dx = x - baseline.x;
+    const dy = y - baseline.y;
+    const side = dominantDirection4(dx, dy);
 
-        const startedAt = motionStartRef.current ?? t;
-        const endCandidateAt = motionEndCandidateRef.current;
-        const quietLongEnough = endCandidateAt ? t - endCandidateAt >= 120 : false;
-        const maxWindowReached = t - startedAt >= 1200;
+    const swingAngle = 30;
+    const resetAngle = 14;
 
-        if (!quietLongEnough && !maxWindowReached) return;
+    // Swing detection with hysteresis: count excursions beyond swingAngle.
+    if (!inSwingRef.current && angleDeg >= swingAngle) {
+      inSwingRef.current = true;
+      swingCountRef.current += 1;
 
-        // Use the time when motion first got "quiet" as the end time, otherwise fast flips become "slow"
-        // because we waited extra 120ms to confirm quietness.
-        const endAt = endCandidateAt ?? t;
-        const durationMs = Math.max(1, Math.round(endAt - startedAt));
-        // Direction: use the first ~200ms window of the motion. Using the whole window often biases toward "bottom".
-        const directionSamples =
-          initialWindowRef.current.length >= 3 ? initialWindowRef.current : samplesRef.current;
-        const mean = meanSample(directionSamples);
-        const dxAvg = mean.x - baseline.x;
-        const dyAvg = mean.y - baseline.y;
+      const count = swingCountRef.current;
+      const speed: FlipSpeed = configRef.current.mode === 8 && count >= 2 ? "fast" : "slow";
+      const predictionId = predictionIdFor(side, speed, configRef.current.mode);
 
-        const side = dominantDirection4(dxAvg, dyAvg);
-        const fastFlipMs = Math.max(50, Number(configRef.current.motion.fastFlipMs || 350));
-        const speed: FlipSpeed =
-          peakCountRef.current >= 2 ? "fast" : durationMs <= fastFlipMs ? "fast" : "slow";
-        const predictionId = predictionIdFor(side, speed, configRef.current.mode);
+      setResult({ side, speed, durationMs: 0, predictionId });
 
+      if (count >= 2 && configRef.current.mode === 8) {
         lockedRef.current = true;
         setState("locked");
-        setResult({ side, speed, durationMs, predictionId });
+      } else {
+        setState("preview");
       }
-    },
-    []
-  );
+    }
+
+    if (inSwingRef.current && angleDeg <= resetAngle) {
+      inSwingRef.current = false;
+    }
+
+    // If performer fully flips after 1st swing — lock the preview.
+    if (!lockedRef.current && st === "preview" && swingCountRef.current === 1 && flipped) {
+      lockedRef.current = true;
+      setState("locked");
+    }
+  }, []);
 
   const attach = useCallback(() => {
     if (listenerAttachedRef.current) return;
@@ -220,33 +199,36 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   }, [handler]);
 
   const calibrate = useCallback(() => {
+    clearTimers();
     samplesRef.current = [];
-    initialWindowRef.current = [];
     baselineRef.current = null;
+    baselineUnitRef.current = null;
+    swingCountRef.current = 0;
+    inSwingRef.current = false;
     lockedRef.current = false;
     setResult(null);
-    peakCountRef.current = 0;
-    aboveRef.current = false;
 
     setState("calibrating");
-    const calibrationMs = Math.max(150, Number(configRef.current.motion.calibrationMs || 350));
-    armedAtRef.current = nowMs();
-    // Give a short "settle" window so the magician can put the phone face-down right after the double tap.
-    calibrationCollectAfterRef.current = armedAtRef.current + 650;
 
+    const calibrationMs = Math.max(150, Number(configRef.current.motion.calibrationMs || 350));
+    const startAt = nowMs();
+    const settleMs = 650;
+
+    // collect after settle
     settleAndCalibrateTimerRef.current = window.setTimeout(() => {
-      const base = meanSample(samplesRef.current);
+      // nothing, collection already happens in handler while calibrating
+    }, settleMs);
+
+    window.setTimeout(() => {
+      const base = meanSample(samplesRef.current.filter((s) => s.t >= startAt + settleMs));
       baselineRef.current = base;
+      baselineUnitRef.current = normalize3(base.x, base.y, base.z);
       samplesRef.current = [];
-      initialWindowRef.current = [];
-      motionStartRef.current = null;
-      motionEndCandidateRef.current = null;
-      peakDeltaRef.current = 0;
-      peakCountRef.current = 0;
-      aboveRef.current = false;
+      swingCountRef.current = 0;
+      inSwingRef.current = false;
       setState("armed");
-    }, 650 + calibrationMs);
-  }, []);
+    }, settleMs + calibrationMs);
+  }, [clearTimers]);
 
   const arm = useCallback(async () => {
     setPermissionError(null);
@@ -256,8 +238,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       return;
     }
 
-    // Allow re-arming after a previous reveal.
+    // allow infinite re-arming
     lockedRef.current = false;
+    swingCountRef.current = 0;
+    inSwingRef.current = false;
     setResult(null);
     clearTimers();
 
@@ -269,27 +253,27 @@ export function useMotionClassifier(config: AppConfig): HookResult {
           setState("idle");
           setPermissionGranted(false);
           setPermissionError(
-            "Доступ к датчикам не разрешён. Откройте Safari → aA → Настройки веб‑сайта → Motion & Orientation Access → Allow."
+            "Доступ к датчикам не разрешён. Safari → aA → Настройки веб‑сайта → Motion & Orientation Access → Allow."
           );
           return;
         }
-      } catch (e) {
+      } catch {
         setState("idle");
         setPermissionGranted(false);
-        setPermissionError("Не удалось запросить разрешение на датчики. Проверьте, что открыто по HTTPS в Safari (iPhone).");
+        setPermissionError("Не удалось запросить разрешение на датчики. Проверьте HTTPS и Safari на iPhone.");
         return;
       }
     }
 
     setPermissionGranted(true);
     attach();
+
     setState("countdown");
     const seconds = Math.max(1, Math.floor(Number(configRef.current.motion.countdownSeconds || 5)));
     countdownTimerRef.current = window.setTimeout(() => {
       calibrate();
     }, seconds * 1000);
 
-    // If we got permission but no events arrive, tell the user what to toggle.
     const startedAt = Date.now();
     window.setTimeout(() => {
       if (lockedRef.current) return;
@@ -307,13 +291,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     setPermissionError(null);
     setResult(null);
     baselineRef.current = null;
+    baselineUnitRef.current = null;
     samplesRef.current = [];
-    initialWindowRef.current = [];
-    motionStartRef.current = null;
-    motionEndCandidateRef.current = null;
-    peakDeltaRef.current = 0;
-    peakCountRef.current = 0;
-    aboveRef.current = false;
+    swingCountRef.current = 0;
+    inSwingRef.current = false;
     lockedRef.current = false;
     setState("idle");
   }, [clearTimers]);
@@ -335,3 +316,4 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     reset
   };
 }
+

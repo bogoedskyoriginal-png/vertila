@@ -6,6 +6,7 @@ export type MotionFlowState =
   | "countdown"
   | "calibrating"
   | "armed"
+  | "preview"
   | "detecting"
   | "locked";
 

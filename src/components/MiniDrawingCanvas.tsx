@@ -15,7 +15,7 @@ type Props = {
 
 function pushStroke(prev: PredictionDrawing, stroke: DrawingStroke): PredictionDrawing {
   const strokes = Array.isArray(prev?.strokes) ? prev.strokes : [];
-  return { v: 1, strokes: [...strokes, stroke] };
+  return { v: 1, aspect: prev?.aspect, strokes: [...strokes, stroke] };
 }
 
 export function MiniDrawingCanvas({ value, drawing, color, tool, onChange, onDrawingChange, height = 160 }: Props) {
@@ -25,7 +25,10 @@ export function MiniDrawingCanvas({ value, drawing, color, tool, onChange, onDra
     lineWidth: 5,
     eraserWidth: 28,
     onStrokeComplete: (stroke) => {
-      onDrawingChange(pushStroke(drawing, stroke));
+      const canvas = canvasRef.current;
+      const rect = canvas?.getBoundingClientRect();
+      const aspect = rect && rect.height > 0 ? rect.width / rect.height : drawing?.aspect;
+      onDrawingChange({ ...pushStroke({ ...drawing, aspect }, stroke), aspect });
     }
   });
 
@@ -51,7 +54,8 @@ export function MiniDrawingCanvas({ value, drawing, color, tool, onChange, onDra
     <div
       style={{
         width: "100%",
-        height,
+        aspectRatio: "4 / 3",
+        minHeight: height,
         borderRadius: 12,
         overflow: "hidden",
         border: "1px solid rgba(0,0,0,0.08)",

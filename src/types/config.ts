@@ -26,6 +26,9 @@ export type DrawingStroke = {
 
 export type PredictionDrawing = {
   v: 1;
+  // Source canvas aspect ratio (width / height) at the time of drawing.
+  // Used to render with "contain" scaling on different screen sizes to avoid stretching.
+  aspect?: number;
   strokes: DrawingStroke[];
 };
 

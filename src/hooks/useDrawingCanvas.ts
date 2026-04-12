@@ -100,6 +100,27 @@ export function useDrawingCanvas({
 
     const dpr = getCanvasDpr(canvas);
     const strokes = Array.isArray(drawing?.strokes) ? drawing.strokes : [];
+    const aspect =
+      typeof drawing?.aspect === "number" && Number.isFinite(drawing.aspect) && drawing.aspect > 0.1
+        ? drawing.aspect
+        : canvas.width / Math.max(1, canvas.height);
+
+    const canvasAspect = canvas.width / Math.max(1, canvas.height);
+    let targetW = canvas.width;
+    let targetH = canvas.height;
+    let offX = 0;
+    let offY = 0;
+    if (canvasAspect > aspect) {
+      targetH = canvas.height;
+      targetW = targetH * aspect;
+      offX = (canvas.width - targetW) / 2;
+    } else {
+      targetW = canvas.width;
+      targetH = targetW / aspect;
+      offY = (canvas.height - targetH) / 2;
+    }
+    const scale = Math.min(targetW / canvas.width, targetH / canvas.height);
+
     for (const s of strokes) {
       const pts = Array.isArray(s?.points) ? s.points : [];
       if (pts.length < 2) continue;
@@ -109,17 +130,17 @@ export function useDrawingCanvas({
       if (s.tool === "eraser") {
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "rgba(0,0,0,1)";
-        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
+        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr * scale;
       } else {
         ctx.globalCompositeOperation = "source-over";
         ctx.strokeStyle = String(s.color || "#111827");
-        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
+        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr * scale;
       }
 
       ctx.beginPath();
-      ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
+      ctx.moveTo(offX + pts[0].x * targetW, offY + pts[0].y * targetH);
       for (let i = 1; i < pts.length; i++) {
-        ctx.lineTo(pts[i].x * canvas.width, pts[i].y * canvas.height);
+        ctx.lineTo(offX + pts[i].x * targetW, offY + pts[i].y * targetH);
       }
       ctx.stroke();
     }

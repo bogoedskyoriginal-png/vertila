@@ -48,7 +48,8 @@ export function DrawPage() {
   const motion = useMotionClassifier(config);
 
   const lastTapAtRef = useRef<number>(0);
-  const revealAppliedRef = useRef(false);
+  const baseSnapshotRef = useRef<string | null>(null);
+  const lastPredictionIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +57,8 @@ export function DrawPage() {
       setLoading(true);
       setRemoteError(null);
       setRemoteConfig(null);
-      revealAppliedRef.current = false;
+      baseSnapshotRef.current = null;
+      lastPredictionIdRef.current = null;
       try {
         const data = await apiGet<UserConfigResponse>(`/api/users/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
@@ -89,15 +91,25 @@ export function DrawPage() {
     };
   }, []);
 
-  // Apply prediction drawing once after lock.
+  // Apply prediction drawing on preview/lock. If a second swing happens, replace the first prediction cleanly.
   useEffect(() => {
     async function apply() {
       if (!canvasApi) return;
-      if (revealAppliedRef.current) return;
-      if (motion.state !== "locked") return;
       if (!motion.result) return;
 
-      revealAppliedRef.current = true;
+      if (motion.state !== "preview" && motion.state !== "locked") return;
+
+      const predId = Number(motion.result.predictionId);
+      if (lastPredictionIdRef.current === predId) return;
+
+      // Snapshot before the first prediction to allow clean replacement on swing #2.
+      if (!baseSnapshotRef.current) {
+        baseSnapshotRef.current = canvasApi.exportDataUrl() ?? null;
+      } else {
+        await canvasApi.drawFromDataUrl(baseSnapshotRef.current, { clear: true });
+      }
+      lastPredictionIdRef.current = predId;
+
       const drawing = findPredictionDrawing(config, motion.result.predictionId);
       if (drawing) {
         await canvasApi.drawStrokes(drawing, { clear: false });
@@ -167,7 +179,8 @@ export function DrawPage() {
             const now = Date.now();
             if (isDoubleTap(lastTapAtRef.current, now)) {
               lastTapAtRef.current = 0;
-              revealAppliedRef.current = false;
+              baseSnapshotRef.current = null;
+              lastPredictionIdRef.current = null;
               void motion.arm();
             } else {
               lastTapAtRef.current = now;
@@ -189,7 +202,8 @@ export function DrawPage() {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              revealAppliedRef.current = false;
+              baseSnapshotRef.current = null;
+              lastPredictionIdRef.current = null;
               void motion.arm();
             }}
             style={{ width: "100%", justifyContent: "center", fontWeight: 900, borderRadius: 18 }}
