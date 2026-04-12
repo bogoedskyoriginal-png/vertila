@@ -39,48 +39,6 @@ function buildGoogleImagesUrl(queryOrUrl: string): string | null {
   return url.toString();
 }
 
-function LinkSearchMock({
-  charging,
-  hasError,
-  onArm
-}: {
-  charging: boolean;
-  hasError: boolean;
-  onArm: () => void;
-}) {
-  return (
-    <div className="linkSpectatorRoot" onClick={onArm} role="button" tabIndex={0} aria-label="search">
-      <div className="linkTopBar" aria-hidden="true">
-        <div className="linkTopDot" />
-        <div className="linkTopDot" />
-        <div className="linkTopDot" />
-      </div>
-      <div className="linkCenter">
-        <div className={charging ? "linkSearchBox linkSearchBoxCharging" : "linkSearchBox"}>
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" className="linkIcon">
-            <path
-              d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Zm6.4-1.1 4.1 4.1"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-          <div className="linkFakeInput" aria-hidden="true" />
-          {charging && <div className="linkSpinner" aria-hidden="true" />}
-          {hasError && <div className="linkErrorDot" aria-hidden="true" />}
-        </div>
-
-        <div className="linkSkeleton">
-          <div className="linkSkLine" />
-          <div className="linkSkLine" />
-          <div className="linkSkLine" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DrawPage() {
   const params = useParams();
   const code = normalizeCode(params.code);
@@ -216,14 +174,21 @@ export function DrawPage() {
   if (outputMode === "links") {
     return (
       <div className="page appFullHeight" style={{ padding: 0 }}>
-        <LinkSearchMock
-          charging={charging}
-          hasError={!!motion.permissionError}
-          onArm={() => {
-            redirectedRef.current = false;
-            void motion.arm();
-          }}
-        />
+        <div className="linkStartRoot">
+          <button
+            type="button"
+            className={charging ? "linkStartBtn linkStartBtnCharging" : "linkStartBtn"}
+            onClick={() => {
+              redirectedRef.current = false;
+              void motion.arm();
+            }}
+            aria-label="start"
+          >
+            Начать
+            {charging && <span className="linkStartSpinner" aria-hidden="true" />}
+            {!!motion.permissionError && <span className="linkStartErrorDot" aria-hidden="true" />}
+          </button>
+        </div>
       </div>
     );
   }
