@@ -18,6 +18,33 @@ const store = createStore({
   filePath: process.env.STORE_PATH
 });
 
+function sanitizeStartUrl(value) {
+  if (typeof value !== "string") return "/";
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("/")) return "/";
+  if (trimmed.startsWith("//")) return "/";
+  if (trimmed.length > 200) return "/";
+  // strip any CR/LF just in case
+  return trimmed.replace(/[\r\n]/g, "");
+}
+
+function buildManifest(startUrl) {
+  return {
+    name: "Триггер",
+    short_name: "Триггер",
+    start_url: startUrl,
+    scope: "/",
+    display: "standalone",
+    background_color: "#050507",
+    theme_color: "#050507",
+    icons: [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icons/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+    ]
+  };
+}
+
 function normalizeCode(code) {
   return String(code || "").trim().toUpperCase();
 }
@@ -142,6 +169,14 @@ function normalizeConfig(input) {
 
 app.get("/api/health", async (_req, res) => {
   res.json({ ok: true, storePath: store.filePath, usersCount: store.listUsers().length });
+});
+
+// Dynamic manifest so "Add to Home Screen" keeps current route (e.g. /TY1)
+app.get("/manifest.webmanifest", async (req, res) => {
+  const startUrl = sanitizeStartUrl(req.query?.start);
+  res.setHeader("Content-Type", "application/manifest+json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(JSON.stringify(buildManifest(startUrl), null, 2));
 });
 
 // Master: list users
