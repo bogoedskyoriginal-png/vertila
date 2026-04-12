@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { AppConfig, AppMode, OutputMode, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
@@ -41,17 +41,8 @@ function updatePredictionLinkQuery(config: AppConfig, id: PredictionId, linkQuer
 }
 
 function labelForId(id: PredictionId, strategy: "speed" | "tilts") {
-  if (strategy === "speed") {
-    if (id === 1) return "ВЕРХ (медленно)";
-    if (id === 2) return "ПРАВО (медленно)";
-    if (id === 3) return "НИЗ (медленно)";
-    if (id === 4) return "ЛЕВО (медленно)";
-    if (id === 5) return "ВЕРХ (быстро)";
-    if (id === 6) return "ПРАВО (быстро)";
-    if (id === 7) return "НИЗ (быстро)";
-    return "ЛЕВО (быстро)";
-  }
-
+  // Intentionally keep magician-facing wording consistent between strategies.
+  // In "tilts" it literally means 1st/2nd tilt; in "speed" it maps slow/fast to the same labels.
   if (id === 1) return "ВЕРХ (1 наклон)";
   if (id === 2) return "ПРАВО (1 наклон)";
   if (id === 3) return "НИЗ (1 наклон)";
@@ -61,7 +52,6 @@ function labelForId(id: PredictionId, strategy: "speed" | "tilts") {
   if (id === 7) return "НИЗ (2 наклона)";
   return "ЛЕВО (2 наклона)";
 }
-
 export function AdminPage() {
   const params = useParams();
   const code = normalizeCode(params.code);
@@ -86,8 +76,13 @@ export function AdminPage() {
     [selectedTemplateId, templates]
   );
 
-  const effectiveStrategy: "speed" | "tilts" =
-    outputMode === "links" ? "tilts" : config.motion?.mode8Strategy || "tilts";
+  const showMode8StrategyToggle = outputMode === "drawings" && config.mode === 8;
+
+  const effectiveStrategy: "speed" | "tilts" = (() => {
+    if (outputMode === "links") return "tilts";
+    if (config.mode !== 8) return "tilts";
+    return config.motion?.mode8Strategy || "tilts";
+  })();
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +98,7 @@ export function AdminPage() {
         if (cancelled) return;
         setRemoteError(
           e instanceof Error && e.message === "API 404"
-            ? "Такого пользователя нет (ID не создан в мастер‑админке)."
+            ? "Такого пользователя нет (ID не создан в мастер-админке)."
             : e instanceof Error
               ? e.message
               : "load_failed"
@@ -183,35 +178,6 @@ export function AdminPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
             <div className="card" style={{ padding: 12, borderRadius: 16 }}>
               <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
-                Тип трюка
-              </div>
-              <div className="segmented segmentedOneCol">
-                <button
-                  type="button"
-                  className={outputMode === "drawings" ? "segBtn segBtnActive" : "segBtn"}
-                  disabled={!!remoteError}
-                  onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), outputMode: "drawings" }))}
-                >
-                  Рисунки
-                </button>
-                <button
-                  type="button"
-                  className={outputMode === "links" ? "segBtn segBtnActive" : "segBtn"}
-                  disabled={!!remoteError}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, outputMode: "links", motion: { ...base.motion, mode8Strategy: "tilts" } };
-                    })
-                  }
-                >
-                  Ссылки
-                </button>
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: 12, borderRadius: 16 }}>
-              <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
                 Количество предсказаний
               </div>
               <div className="segmented">
@@ -234,40 +200,41 @@ export function AdminPage() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: 12, borderRadius: 16 }}>
-              <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
-                Способ активации предсказания
+            {showMode8StrategyToggle && (
+              <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+                <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
+                  Способ активации предсказания
+                </div>
+                <div className="segmented segmentedOneCol">
+                  <button
+                    type="button"
+                    className={effectiveStrategy === "tilts" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, mode8Strategy: "tilts" } };
+                      })
+                    }
+                  >
+                    Наклоны
+                  </button>
+                  <button
+                    type="button"
+                    className={effectiveStrategy === "speed" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, mode8Strategy: "speed" } };
+                      })
+                    }
+                  >
+                    Скорость
+                  </button>
+                </div>
               </div>
-              <div className="segmented segmentedOneCol">
-                <button
-                  type="button"
-                  className={effectiveStrategy === "tilts" ? "segBtn segBtnActive" : "segBtn"}
-                  disabled={!!remoteError}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, motion: { ...base.motion, mode8Strategy: "tilts" } };
-                    })
-                  }
-                >
-                  Наклоны
-                </button>
-                <button
-                  type="button"
-                  className={effectiveStrategy === "speed" ? "segBtn segBtnActive" : "segBtn"}
-                  disabled={!!remoteError || outputMode === "links" || config.mode !== 8}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, motion: { ...base.motion, mode8Strategy: "speed" } };
-                    })
-                  }
-                >
-                  Скорость
-                </button>
-              </div>
-              {outputMode === "links" && <div className="hint" style={{ marginTop: 8 }}>В режиме ссылок используется только наклон.</div>}
-            </div>
+            )}
 
             <div className="card" style={{ padding: 12, borderRadius: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Шаблоны</div>
@@ -455,4 +422,6 @@ export function AdminPage() {
     </div>
   );
 }
+
+
 

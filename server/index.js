@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 
 import { makeUserCode, safeEqual } from "./ids.js";
 import { isValidConfig } from "./validate.js";
@@ -253,9 +254,35 @@ app.put("/api/users/:code/config", async (req, res) => {
 });
 
 const distDir = path.resolve(__dirname, "..", "dist");
-app.use(express.static(distDir));
-app.get(/^(?!\/api\/).*/, (_req, res) => {
-  res.sendFile(path.join(distDir, "index.html"));
+const indexHtmlPath = path.join(distDir, "index.html");
+let indexHtmlCache = null;
+try {
+  indexHtmlCache = fs.readFileSync(indexHtmlPath, "utf8");
+} catch {
+  indexHtmlCache = null;
+}
+
+app.use(express.static(distDir, { index: false }));
+
+function withPerRouteManifest(html, startUrl) {
+  const manifestHref = `/manifest.webmanifest?start=${encodeURIComponent(startUrl)}&v=3`;
+
+  // Replace existing manifest link if present
+  if (html.includes('rel="manifest"')) {
+    return html.replace(/rel="manifest"\s+href="\/manifest\.webmanifest[^"]*"/, `rel="manifest" href="${manifestHref}"`);
+  }
+
+  // Fallback: inject before </head>
+  return html.replace("</head>", `  <link rel="manifest" href="${manifestHref}" />\n  </head>`);
+}
+
+app.get(/^(?!\/api\/).*/, (req, res) => {
+  const startUrl = sanitizeStartUrl(req.path || "/");
+  const baseHtml = indexHtmlCache ?? fs.readFileSync(indexHtmlPath, "utf8");
+  const html = withPerRouteManifest(baseHtml, startUrl);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(html);
 });
 
 const port = Number(process.env.PORT || 8787);
