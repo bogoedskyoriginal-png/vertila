@@ -38,7 +38,6 @@ export function MasterPage() {
   const [newCode, setNewCode] = useState("");
   const [search, setSearch] = useState("");
 
-  const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{ code: string; createdAt: number; updatedAt: number }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,15 +48,6 @@ export function MasterPage() {
   }, [masterPass, masterUser]);
 
   const base = typeof window !== "undefined" ? window.location.origin : "";
-  const links = useMemo(() => {
-    if (!createdCode) return null;
-    const code = encodeURIComponent(createdCode);
-    return {
-      code: createdCode,
-      spectator: `${base}/${code}`,
-      magician: `${base}/${code}/admin`
-    };
-  }, [base, createdCode]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toUpperCase();
@@ -85,7 +75,6 @@ export function MasterPage() {
 
   useEffect(() => {
     setError(null);
-    setCreatedCode(null);
     setUsers([]);
     if (!auth) return;
     refresh().catch(() => undefined);
@@ -135,13 +124,13 @@ export function MasterPage() {
     if (!auth) return;
     setBusy(true);
     setError(null);
-    setCreatedCode(null);
     try {
       const body = code ? { code } : {};
       const res = await apiSend<MasterCreateUserResponse>("/api/master/users", "POST", body, auth);
-      setCreatedCode(res.code);
       setNewCode("");
       await refresh();
+      setTab("list");
+      setSearch(res.code);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "create_failed";
       setError(msg === "API 401" ? "Неверный логин/пароль мастер‑админки." : msg);
@@ -236,33 +225,6 @@ export function MasterPage() {
                   </button>
                 </div>
               </div>
-
-              {links && (
-                <div style={{ marginTop: 14 }}>
-                  <div className="masterDivider" />
-                  <div className="masterSectionTitle" style={{ marginTop: 12 }}>
-                    Ссылки
-                  </div>
-                  <div className="masterLinkRow">
-                    <div className="masterLinkText">{links.spectator}</div>
-                    <button
-                      className="masterBtn masterBtnSmall"
-                      onClick={() => navigator.clipboard.writeText(links.spectator)}
-                    >
-                      Копировать
-                    </button>
-                  </div>
-                  <div className="masterLinkRow">
-                    <div className="masterLinkText">{links.magician}</div>
-                    <button
-                      className="masterBtn masterBtnSmall"
-                      onClick={() => navigator.clipboard.writeText(links.magician)}
-                    >
-                      Копировать
-                    </button>
-                  </div>
-                </div>
-              )}
 
               <div className="masterCount" style={{ marginTop: 14 }}>
                 Пользователей: {users.length}
