@@ -109,13 +109,14 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   const handler = useCallback(
     (e: DeviceMotionEvent) => {
       if (lockedRef.current) return;
-      const st = stateRef.current;
-      if (st !== "calibrating" && st !== "armed" && st !== "detecting") return;
-
       const a = e.accelerationIncludingGravity;
       if (!a) return;
 
+      // Keep a heartbeat even during countdown to avoid false "no events" errors.
       lastEventAtRef.current = Date.now();
+
+      const st = stateRef.current;
+      if (st !== "calibrating" && st !== "armed" && st !== "detecting") return;
 
       const x = Number(a.x || 0);
       const y = Number(a.y || 0);
@@ -171,7 +172,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
         if (!quietLongEnough && !maxWindowReached) return;
 
-        const durationMs = Math.max(1, Math.round(t - startedAt));
+        // Use the time when motion first got "quiet" as the end time, otherwise fast flips become "slow"
+        // because we waited extra 120ms to confirm quietness.
+        const endAt = endCandidateAt ?? t;
+        const durationMs = Math.max(1, Math.round(endAt - startedAt));
         // Direction: use the first ~200ms window of the motion. Using the whole window often biases toward "bottom".
         const directionSamples =
           initialWindowRef.current.length >= 3 ? initialWindowRef.current : samplesRef.current;
@@ -279,8 +283,6 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         setPermissionError(
           "Датчики не отдают события. Откройте именно Safari (не встроенный браузер) и включите Motion & Orientation Access для сайта."
         );
-        setState("idle");
-        setPermissionGranted(false);
       }
     }, 1400);
   }, [attach, calibrate, clearTimers, sensorAvailable]);
