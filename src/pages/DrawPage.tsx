@@ -5,7 +5,7 @@ import type { DrawingCanvasApi } from "../components/DrawingCanvas";
 import { Toolbar } from "../components/Toolbar";
 import type { DrawingTool } from "../hooks/useDrawingCanvas";
 import { useMotionClassifier } from "../hooks/useMotionClassifier";
-import type { AppConfig, PredictionId } from "../types/config";
+import type { AppConfig, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
@@ -19,6 +19,13 @@ function normalizeCode(code: string | undefined) {
 function findPredictionImage(config: AppConfig, id: PredictionId) {
   const p = config.predictions.find((x) => x.id === id);
   return String(p?.imageDataUrl || "");
+}
+
+function findPredictionDrawing(config: AppConfig, id: PredictionId): PredictionDrawing | null {
+  const p = config.predictions.find((x) => x.id === id);
+  const d = p?.drawing;
+  if (d && d.v === 1 && Array.isArray(d.strokes) && d.strokes.length > 0) return d;
+  return null;
 }
 
 function isDoubleTap(lastTapAt: number, now: number) {
@@ -81,10 +88,15 @@ export function DrawPage() {
       if (motion.state !== "locked") return;
       if (!motion.result) return;
 
+      revealAppliedRef.current = true;
+      const drawing = findPredictionDrawing(config, motion.result.predictionId);
+      if (drawing) {
+        await canvasApi.drawStrokes(drawing, { clear: false });
+        return;
+      }
+
       const img = findPredictionImage(config, motion.result.predictionId);
       if (!img) return;
-
-      revealAppliedRef.current = true;
       await canvasApi.drawFromDataUrl(img, { clear: false });
     }
     apply().catch(() => undefined);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { AppConfig, AppMode, PredictionId } from "../types/config";
+import type { AppConfig, AppMode, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
@@ -22,6 +22,22 @@ function updatePredictionImage(config: AppConfig, id: PredictionId, imageDataUrl
   return {
     ...config,
     predictions: config.predictions.map((p) => (p.id === id ? { ...p, imageDataUrl } : p))
+  };
+}
+
+function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: PredictionDrawing): AppConfig {
+  return {
+    ...config,
+    predictions: config.predictions.map((p) => (p.id === id ? { ...p, drawing } : p))
+  };
+}
+
+function clearPrediction(config: AppConfig, id: PredictionId): AppConfig {
+  return {
+    ...config,
+    predictions: config.predictions.map((p) =>
+      p.id === id ? { ...p, imageDataUrl: "", drawing: { v: 1, strokes: [] } } : p
+    )
   };
 }
 
@@ -98,7 +114,7 @@ export function AdminPage() {
           <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
           <button
             className="btn"
-            onClick={() => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, ""))}
+            onClick={() => setRemote((prev) => clearPrediction(prev ?? DEFAULT_CONFIG, id))}
             style={{ padding: "6px 10px", minHeight: 38 }}
           >
             Очистить
@@ -107,9 +123,11 @@ export function AdminPage() {
 
         <MiniDrawingCanvas
           value={p.imageDataUrl}
+          drawing={p.drawing ?? { v: 1, strokes: [] }}
           color={color}
           tool={tool}
           onChange={(dataUrl) => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, dataUrl))}
+          onDrawingChange={(drawing) => setRemote((prev) => updatePredictionDrawing(prev ?? DEFAULT_CONFIG, id, drawing))}
           height={170}
         />
       </div>
@@ -186,7 +204,8 @@ export function AdminPage() {
                     const prev = config.predictions.find((p) => p.id === base.id);
                     return {
                       ...base,
-                      imageDataUrl: String(prev?.imageDataUrl || "")
+                      imageDataUrl: String(prev?.imageDataUrl || ""),
+                      drawing: prev?.drawing && prev.drawing.v === 1 ? prev.drawing : { v: 1, strokes: [] }
                     };
                   })
                 };
@@ -209,7 +228,9 @@ export function AdminPage() {
                 const ids = predictionIdsForMode(base.mode);
                 return {
                   ...base,
-                  predictions: base.predictions.map((p) => (ids.includes(p.id as any) ? { ...p, imageDataUrl: "" } : p))
+                  predictions: base.predictions.map((p) =>
+                    ids.includes(p.id as any) ? { ...p, imageDataUrl: "", drawing: { v: 1, strokes: [] } } : p
+                  )
                 };
               });
             }}

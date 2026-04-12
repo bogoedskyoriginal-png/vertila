@@ -1,30 +1,46 @@
 import { useEffect } from "react";
 import { useDrawingCanvas } from "../hooks/useDrawingCanvas";
 import type { DrawingTool } from "../hooks/useDrawingCanvas";
+import type { DrawingStroke, PredictionDrawing } from "../types/config";
 
 type Props = {
   value: string;
+  drawing: PredictionDrawing;
   color: string;
   tool: DrawingTool;
   onChange: (dataUrl: string) => void;
+  onDrawingChange: (drawing: PredictionDrawing) => void;
   height?: number;
 };
 
-export function MiniDrawingCanvas({ value, color, tool, onChange, height = 160 }: Props) {
-  const { canvasRef, bindPointerHandlers, clear, exportDataUrl, drawFromDataUrl } = useDrawingCanvas({
+function pushStroke(prev: PredictionDrawing, stroke: DrawingStroke): PredictionDrawing {
+  const strokes = Array.isArray(prev?.strokes) ? prev.strokes : [];
+  return { v: 1, strokes: [...strokes, stroke] };
+}
+
+export function MiniDrawingCanvas({ value, drawing, color, tool, onChange, onDrawingChange, height = 160 }: Props) {
+  const { canvasRef, bindPointerHandlers, clear, exportDataUrl, drawStrokes, drawFromDataUrl } = useDrawingCanvas({
     color,
     tool,
     lineWidth: 5,
-    eraserWidth: 28
+    eraserWidth: 28,
+    onStrokeComplete: (stroke) => {
+      onDrawingChange(pushStroke(drawing, stroke));
+    }
   });
 
   useEffect(() => {
-    if (!value) {
-      clear();
+    const strokes = Array.isArray(drawing?.strokes) ? drawing.strokes : [];
+    if (strokes.length > 0) {
+      drawStrokes(drawing, { clear: true }).catch(() => undefined);
       return;
     }
-    drawFromDataUrl(value, { clear: true }).catch(() => undefined);
-  }, [clear, drawFromDataUrl, value]);
+    if (value) {
+      drawFromDataUrl(value, { clear: true }).catch(() => undefined);
+      return;
+    }
+    clear();
+  }, [clear, drawFromDataUrl, drawStrokes, drawing, value]);
 
   const commit = () => {
     const url = exportDataUrl();

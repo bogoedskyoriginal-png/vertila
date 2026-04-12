@@ -5,6 +5,7 @@ import type { DrawingTool } from "../hooks/useDrawingCanvas";
 export type DrawingCanvasApi = {
   clear: () => void;
   exportDataUrl: () => string | null;
+  drawStrokes: (drawing: import("../types/config").PredictionDrawing, opts?: { clear?: boolean }) => Promise<void>;
   drawFromDataUrl: (dataUrl: string, opts?: { clear?: boolean }) => Promise<void>;
 };
 
@@ -29,7 +30,7 @@ export function DrawingCanvas({
   onReady,
   onStrokeEnd
 }: Props) {
-  const { canvasRef, bindPointerHandlers, clear, exportDataUrl, drawFromDataUrl } = useDrawingCanvas({
+  const { canvasRef, bindPointerHandlers, clear, exportDataUrl, drawStrokes, drawFromDataUrl } = useDrawingCanvas({
     color,
     tool,
     lineWidth,
@@ -37,8 +38,8 @@ export function DrawingCanvas({
   });
 
   useEffect(() => {
-    onReady?.({ clear, exportDataUrl, drawFromDataUrl });
-  }, [clear, drawFromDataUrl, exportDataUrl, onReady]);
+    onReady?.({ clear, exportDataUrl, drawStrokes, drawFromDataUrl });
+  }, [clear, drawFromDataUrl, exportDataUrl, onReady, drawStrokes]);
 
   return (
     <div

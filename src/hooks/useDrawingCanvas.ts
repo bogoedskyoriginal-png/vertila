@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import type { DrawingStroke, PredictionDrawing } from "../types/config";
 
 type Point = { x: number; y: number };
 
@@ -10,6 +11,7 @@ type Options = {
   tool?: DrawingTool;
   lineWidth?: number;
   eraserWidth?: number;
+  onStrokeComplete?: (stroke: DrawingStroke) => void;
 };
 
 function getCanvasPoint(canvas: HTMLCanvasElement, clientX: number, clientY: number): Point {
@@ -25,10 +27,24 @@ function getCanvasDpr(canvas: HTMLCanvasElement): number {
   return Math.max(1, canvas.width / w);
 }
 
-export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWidth = 28 }: Options) {
+function getNormalizedPoint(canvas: HTMLCanvasElement, clientX: number, clientY: number) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (clientX - rect.left) / Math.max(1, rect.width);
+  const y = (clientY - rect.top) / Math.max(1, rect.height);
+  return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+}
+
+export function useDrawingCanvas({
+  color,
+  tool = "pen",
+  lineWidth = 5,
+  eraserWidth = 28,
+  onStrokeComplete
+}: Options) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
+  const currentStrokeRef = useRef<DrawingStroke | null>(null);
 
   const applyStrokeStyle = useCallback(
     (ctx: CanvasRenderingContext2D) => {
@@ -67,6 +83,45 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
       return canvas.toDataURL("image/png");
     } catch {
       return null;
+    }
+  }, []);
+
+  const drawStrokes = useCallback(async (drawing: PredictionDrawing, opts?: { clear?: boolean }) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    if (opts?.clear !== false) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const dpr = getCanvasDpr(canvas);
+    const strokes = Array.isArray(drawing?.strokes) ? drawing.strokes : [];
+    for (const s of strokes) {
+      const pts = Array.isArray(s?.points) ? s.points : [];
+      if (pts.length < 2) continue;
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      if (s.tool === "eraser") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = String(s.color || "#111827");
+        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x * canvas.width, pts[i].y * canvas.height);
+      }
+      ctx.stroke();
     }
   }, []);
 
@@ -139,8 +194,16 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
       isDrawingRef.current = true;
       applyStrokeStyle(ctx);
       lastPointRef.current = getCanvasPoint(canvas, clientX, clientY);
+
+      const widthCss = tool === "eraser" ? eraserWidth : lineWidth;
+      currentStrokeRef.current = {
+        tool,
+        color,
+        width: widthCss,
+        points: [getNormalizedPoint(canvas, clientX, clientY)]
+      };
     },
-    [applyStrokeStyle]
+    [applyStrokeStyle, color, eraserWidth, lineWidth, tool]
   );
 
   const move = useCallback(
@@ -163,6 +226,15 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
       ctx.lineTo(next.x, next.y);
       ctx.stroke();
       lastPointRef.current = next;
+
+      const st = currentStrokeRef.current;
+      if (st) {
+        const p = getNormalizedPoint(canvas, clientX, clientY);
+        const lastP = st.points[st.points.length - 1];
+        const dx = p.x - lastP.x;
+        const dy = p.y - lastP.y;
+        if (dx * dx + dy * dy > 0.000002) st.points.push(p);
+      }
     },
     [applyStrokeStyle]
   );
@@ -170,7 +242,10 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
   const end = useCallback(() => {
     isDrawingRef.current = false;
     lastPointRef.current = null;
-  }, []);
+    const st = currentStrokeRef.current;
+    currentStrokeRef.current = null;
+    if (st && st.points.length >= 2) onStrokeComplete?.(st);
+  }, [onStrokeComplete]);
 
   const bindPointerHandlers = useMemo(() => {
     return {
@@ -207,6 +282,7 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
     canvasRef,
     clear,
     exportDataUrl,
+    drawStrokes,
     drawFromDataUrl,
     bindPointerHandlers
   };

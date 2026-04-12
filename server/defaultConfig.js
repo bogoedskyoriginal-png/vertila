@@ -21,7 +21,8 @@ export const DEFAULT_CONFIG = {
                   : id === 7
                     ? "Bottom (fast)"
                     : "Left (fast)",
-    imageDataUrl: ""
+    imageDataUrl: "",
+    drawing: { v: 1, strokes: [] }
   })),
   motion: {
     countdownSeconds: 5,

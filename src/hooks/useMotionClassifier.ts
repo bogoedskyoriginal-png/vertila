@@ -86,6 +86,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   const motionStartRef = useRef<number | null>(null);
   const motionEndCandidateRef = useRef<number | null>(null);
   const peakDeltaRef = useRef<number>(0);
+  const peakCountRef = useRef<number>(0);
+  const aboveRef = useRef<boolean>(false);
 
   const listenerAttachedRef = useRef(false);
   const lockedRef = useRef(false);
@@ -143,6 +145,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
           motionStartRef.current = t;
           motionEndCandidateRef.current = null;
           peakDeltaRef.current = delta;
+          peakCountRef.current = 0;
+          aboveRef.current = true;
           samplesRef.current = [{ t, x, y, z }];
           initialWindowRef.current = [{ t, x, y, z }];
           setState("detecting");
@@ -159,6 +163,12 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         peakDeltaRef.current = Math.max(peakDeltaRef.current, delta);
 
         const quietThreshold = motionThreshold * 0.6;
+        // Count "peaks" above threshold (helps for 8-outcome mode if the performer does 2 quick shakes).
+        if (delta >= motionThreshold && !aboveRef.current) aboveRef.current = true;
+        if (delta < quietThreshold && aboveRef.current) {
+          aboveRef.current = false;
+          peakCountRef.current += 1;
+        }
         if (delta < quietThreshold) {
           if (!motionEndCandidateRef.current) motionEndCandidateRef.current = t;
         } else {
@@ -185,7 +195,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
         const side = dominantDirection4(dxAvg, dyAvg);
         const fastFlipMs = Math.max(50, Number(configRef.current.motion.fastFlipMs || 350));
-        const speed: FlipSpeed = durationMs <= fastFlipMs ? "fast" : "slow";
+        const speed: FlipSpeed =
+          peakCountRef.current >= 2 ? "fast" : durationMs <= fastFlipMs ? "fast" : "slow";
         const predictionId = predictionIdFor(side, speed, configRef.current.mode);
 
         lockedRef.current = true;
@@ -214,6 +225,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     baselineRef.current = null;
     lockedRef.current = false;
     setResult(null);
+    peakCountRef.current = 0;
+    aboveRef.current = false;
 
     setState("calibrating");
     const calibrationMs = Math.max(150, Number(configRef.current.motion.calibrationMs || 350));
@@ -229,6 +242,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       motionStartRef.current = null;
       motionEndCandidateRef.current = null;
       peakDeltaRef.current = 0;
+      peakCountRef.current = 0;
+      aboveRef.current = false;
       setState("armed");
     }, 650 + calibrationMs);
   }, []);
@@ -297,6 +312,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     motionStartRef.current = null;
     motionEndCandidateRef.current = null;
     peakDeltaRef.current = 0;
+    peakCountRef.current = 0;
+    aboveRef.current = false;
     lockedRef.current = false;
     setState("idle");
   }, [clearTimers]);

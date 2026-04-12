@@ -10,6 +10,23 @@ export type PredictionItem = {
   label: string;
   // PNG data URL. Empty string = not set yet.
   imageDataUrl: string;
+  // Vector strokes to render prediction at any size (prevents pixelation).
+  drawing?: PredictionDrawing;
+};
+
+export type DrawingPoint = { x: number; y: number };
+
+export type DrawingStroke = {
+  tool: "pen" | "eraser";
+  color: string;
+  // Width in CSS pixels (will be converted to canvas px using DPR).
+  width: number;
+  points: DrawingPoint[];
+};
+
+export type PredictionDrawing = {
+  v: 1;
+  strokes: DrawingStroke[];
 };
 
 export type MotionConfig = {

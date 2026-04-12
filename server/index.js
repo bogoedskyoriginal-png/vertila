@@ -80,7 +80,8 @@ function normalizeConfig(input) {
         return {
           id: base.id,
           label: base.label,
-          imageDataUrl: String(prev?.imageDataUrl || "")
+          imageDataUrl: String(prev?.imageDataUrl || ""),
+          drawing: { v: 1, strokes: [] }
         };
       }),
       motion: {
@@ -103,10 +104,15 @@ function normalizeConfig(input) {
     mode,
     predictions: DEFAULT_CONFIG.predictions.map((base) => {
       const prev = byId.get(base.id);
+      const prevDrawing = prev?.drawing;
       return {
         id: base.id,
         label: base.label,
-        imageDataUrl: String(prev?.imageDataUrl || "")
+        imageDataUrl: String(prev?.imageDataUrl || ""),
+        drawing:
+          prevDrawing && prevDrawing.v === 1 && Array.isArray(prevDrawing.strokes)
+            ? prevDrawing
+            : { v: 1, strokes: [] }
       };
     }),
     motion: {
