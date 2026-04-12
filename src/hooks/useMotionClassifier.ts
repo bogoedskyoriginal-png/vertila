@@ -162,17 +162,12 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       swingCountRef.current += 1;
 
       const count = swingCountRef.current;
-      const mode = configRef.current.mode;
-      const outputMode = (configRef.current as any).outputMode || "drawings";
-      const speed: FlipSpeed = mode === 8 && count >= 2 ? "fast" : "slow";
-      const predictionId = predictionIdFor(side, speed, mode);
+      const speed: FlipSpeed = configRef.current.mode === 8 && count >= 2 ? "fast" : "slow";
+      const predictionId = predictionIdFor(side, speed, configRef.current.mode);
 
       setResult({ side, speed, durationMs: 0, predictionId });
 
-      // Link mode needs an immediate "commit" in 4-outcome mode, because leaving the page
-      // for a redirect would otherwise prevent the performer from completing a full flip.
-      const lockNow = (mode === 8 && count >= 2) || (outputMode === "google_images" && mode === 4 && count >= 1);
-      if (lockNow) {
+      if (count >= 2 && configRef.current.mode === 8) {
         lockedRef.current = true;
         setState("locked");
       } else {
@@ -321,3 +316,4 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     reset
   };
 }
+
