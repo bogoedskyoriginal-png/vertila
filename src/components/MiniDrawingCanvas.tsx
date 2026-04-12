@@ -46,11 +46,16 @@ export function MiniDrawingCanvas({ value, color, tool, onChange, height = 160 }
       <canvas
         ref={canvasRef}
         {...bindPointerHandlers}
-        onPointerUp={commit}
-        onPointerCancel={commit}
+        onPointerUp={(e) => {
+          bindPointerHandlers.onPointerUp?.(e as any);
+          commit();
+        }}
+        onPointerCancel={(e) => {
+          bindPointerHandlers.onPointerCancel?.(e as any);
+          commit();
+        }}
         style={{ display: "block", width: "100%", height: "100%" }}
       />
     </div>
   );
 }
-
