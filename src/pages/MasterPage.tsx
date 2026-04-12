@@ -31,7 +31,7 @@ function safeSetLs(key: string, value: string) {
 }
 
 export function MasterPage() {
-  // Defaults match server-side fallback (MASTER_USER/MASTER_PASS not set)
+  // Defaults match server fallback (MASTER_USER/MASTER_PASS not set)
   const [masterUser, setMasterUser] = useState(() => safeGetLs(LS_MASTER_USER) ?? "master");
   const [masterPass, setMasterPass] = useState(() => safeGetLs(LS_MASTER_PASS) ?? "master123");
 
@@ -81,6 +81,25 @@ export function MasterPage() {
     refresh().catch(() => undefined);
   }, [auth?.Authorization, refresh]);
 
+  async function createWithCode(code: string | null) {
+    if (!auth) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const body = code ? { code } : {};
+      await apiSend<MasterCreateUserResponse>("/api/master/users", "POST", body, auth);
+      setNewCode("");
+      await refresh();
+      setTab("list");
+      setSearch("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "create_failed";
+      setError(msg === "API 401" ? "Неверный логин/пароль мастер‑админки." : msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!auth) {
     return (
       <div className="masterRoot">
@@ -119,25 +138,6 @@ export function MasterPage() {
         </div>
       </div>
     );
-  }
-
-  async function createWithCode(code: string | null) {
-    if (!auth) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const body = code ? { code } : {};
-      const res = await apiSend<MasterCreateUserResponse>("/api/master/users", "POST", body, auth);
-      setNewCode("");
-      await refresh();
-      setTab("list");
-      setSearch(res.code);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "create_failed";
-      setError(msg === "API 401" ? "Неверный логин/пароль мастер‑админки." : msg);
-    } finally {
-      setBusy(false);
-    }
   }
 
   return (
@@ -181,54 +181,38 @@ export function MasterPage() {
                   placeholder="Поиск по ID"
                   className="masterInput"
                 />
-                <button
-                  className="masterBtn masterBtnPrimary"
-                  disabled={busy}
-                  onClick={() => {
-                    void refresh();
-                  }}
-                >
+                <button className="masterBtn masterBtnPrimary" disabled={busy} onClick={() => void refresh()}>
                   Обновить
                 </button>
               </div>
+
               {error && <div className="masterError">{error}</div>}
+
               <div className="masterDivider" style={{ marginTop: 14 }} />
             </>
           ) : (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
-            <input
-              value={newCode}
-              onChange={(e) => setNewCode(normalizeCodeInput(e.target.value))}
-              placeholder="Введите ID для создания ссылок"
-              maxLength={10}
-              className="masterInput"
-            />
-
+                <input
+                  value={newCode}
+                  onChange={(e) => setNewCode(normalizeCodeInput(e.target.value))}
+                  placeholder="Введите ID для создания ссылок"
+                  maxLength={10}
+                  className="masterInput"
+                />
                 <div className="masterRow2">
-                  <button
-                    className="masterBtn"
-                    disabled={busy}
-                    onClick={() => {
-                      void createWithCode(null);
-                    }}
-                  >
+                  <button className="masterBtn" disabled={busy} onClick={() => void createWithCode(null)}>
                     Сгенерировать
                   </button>
                   <button
                     className="masterBtn masterBtnPrimary"
                     disabled={busy || !newCode.trim()}
-                    onClick={() => {
-                      void createWithCode(newCode.trim().toUpperCase());
-                    }}
+                    onClick={() => void createWithCode(newCode.trim().toUpperCase())}
                   >
                     Создать
                   </button>
                 </div>
-              </div>
-
-              <div className="masterCount" style={{ marginTop: 14 }}>
-                Пользователей: {users.length}
+                <div className="masterCount">Пользователей: {users.length}</div>
               </div>
 
               {error && <div className="masterError">{error}</div>}
@@ -246,16 +230,11 @@ export function MasterPage() {
                 const magicianUrl = `${base}/${encodeURIComponent(u.code)}/admin`;
                 return (
                   <div key={u.code} className="masterUserRow">
-                    <div className="masterUserMain">
+                    <div className="masterUserHeader">
                       <div className="masterUserId">{u.code}</div>
-                      <div className="masterUserLinks">
-                        <div className="masterUserLink">{spectatorUrl}</div>
-                        <div className="masterUserLink">{magicianUrl}</div>
-                      </div>
-                    </div>
-                    <div className="masterUserActions">
                       <button
                         className="masterBtn masterBtnSmall"
+                        disabled={busy}
                         onClick={async () => {
                           if (!confirm(`Удалить пользователя ${u.code}?`)) return;
                           setBusy(true);
@@ -272,9 +251,17 @@ export function MasterPage() {
                       >
                         Удалить
                       </button>
+                    </div>
+
+                    <div className="masterUserLinkRow">
+                      <div className="masterUserLinkText">{spectatorUrl}</div>
                       <button className="masterBtn masterBtnSmall" onClick={() => navigator.clipboard.writeText(spectatorUrl)}>
                         Копировать
                       </button>
+                    </div>
+
+                    <div className="masterUserLinkRow">
+                      <div className="masterUserLinkText">{magicianUrl}</div>
                       <button className="masterBtn masterBtnSmall" onClick={() => navigator.clipboard.writeText(magicianUrl)}>
                         Копировать
                       </button>
@@ -289,3 +276,4 @@ export function MasterPage() {
     </div>
   );
 }
+

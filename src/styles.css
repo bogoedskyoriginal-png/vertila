@@ -501,13 +501,16 @@ textarea {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
   padding-top: 12px;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: start;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
-.masterUserMain {
-  min-width: 0;
+.masterUserHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .masterUserId {
@@ -516,24 +519,17 @@ textarea {
   font-size: 18px;
 }
 
-.masterUserLinks {
-  margin-top: 10px;
+.masterUserLinkRow {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
 }
 
-.masterUserLink {
+.masterUserLinkText {
   word-break: break-all;
   opacity: 0.9;
   font-size: 14px;
-}
-
-.masterUserActions {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  justify-items: end;
 }
 
 .masterLinkRow {
@@ -556,12 +552,8 @@ textarea {
   .masterRow2 {
     grid-template-columns: 1fr;
   }
-  .masterUserRow {
+  .masterUserLinkRow {
     grid-template-columns: 1fr;
-  }
-  .masterUserActions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    justify-items: stretch;
   }
 }
 
