@@ -31,8 +31,9 @@ function safeSetLs(key: string, value: string) {
 }
 
 export function MasterPage() {
-  const [masterUser, setMasterUser] = useState(() => safeGetLs(LS_MASTER_USER) ?? "");
-  const [masterPass, setMasterPass] = useState(() => safeGetLs(LS_MASTER_PASS) ?? "");
+  // Defaults match server-side fallback (MASTER_USER/MASTER_PASS not set)
+  const [masterUser, setMasterUser] = useState(() => safeGetLs(LS_MASTER_USER) ?? "master");
+  const [masterPass, setMasterPass] = useState(() => safeGetLs(LS_MASTER_PASS) ?? "master123");
 
   const [tab, setTab] = useState<"list" | "add">("list");
   const [newCode, setNewCode] = useState("");
