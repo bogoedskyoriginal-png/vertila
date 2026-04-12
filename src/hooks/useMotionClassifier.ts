@@ -25,6 +25,34 @@ function isIossafariPermissionFlowSupported(): boolean {
   return typeof DME?.requestPermission === "function";
 }
 
+async function requestIosMotionPermission(): Promise<boolean> {
+  const w = window as any;
+
+  const reqMotion = w.DeviceMotionEvent?.requestPermission as undefined | (() => Promise<"granted" | "denied">);
+  const reqOrient = w.DeviceOrientationEvent?.requestPermission as undefined | (() => Promise<"granted" | "denied">);
+
+  // Some iOS versions are picky; try both permission APIs when present.
+  try {
+    if (typeof reqMotion === "function") {
+      const r = await reqMotion();
+      if (r === "granted") return true;
+    }
+  } catch {
+    // ignore, try orientation
+  }
+
+  try {
+    if (typeof reqOrient === "function") {
+      const r = await reqOrient();
+      if (r === "granted") return true;
+    }
+  } catch {
+    // ignore
+  }
+
+  return false;
+}
+
 function predictionIdFor(side: Direction4, speed: FlipSpeed, mode: 4 | 8): PredictionId {
   if (mode === 4) {
     return (side === "top" ? 1 : side === "right" ? 2 : side === "bottom" ? 3 : 4) as PredictionId;
@@ -50,6 +78,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
   const baselineRef = useRef<Baseline | null>(null);
   const samplesRef = useRef<MotionSample[]>([]);
+  const lastEventAtRef = useRef<number>(0);
 
   const armedAtRef = useRef<number>(0);
   const calibrationCollectAfterRef = useRef<number>(0);
@@ -74,6 +103,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
       const a = e.accelerationIncludingGravity;
       if (!a) return;
+
+      lastEventAtRef.current = Date.now();
 
       const x = Number(a.x || 0);
       const y = Number(a.y || 0);
@@ -190,17 +221,16 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     if (isIossafariPermissionFlowSupported()) {
       setState("requestingPermission");
       try {
-        const w = window as unknown as {
-          DeviceMotionEvent?: { requestPermission?: () => Promise<"granted" | "denied"> };
-        };
-        const res = await w.DeviceMotionEvent!.requestPermission!();
-        if (res !== "granted") {
+        const ok = await requestIosMotionPermission();
+        if (!ok) {
           setState("idle");
           setPermissionGranted(false);
-          setPermissionError("Доступ к датчикам не разрешён (в Safari откройте настройки сайта и разрешите Motion).");
+          setPermissionError(
+            "Доступ к датчикам не разрешён. Откройте Safari → aA → Настройки веб‑сайта → Motion & Orientation Access → Allow."
+          );
           return;
         }
-      } catch {
+      } catch (e) {
         setState("idle");
         setPermissionGranted(false);
         setPermissionError("Не удалось запросить разрешение на датчики. Проверьте, что открыто по HTTPS в Safari (iPhone).");
@@ -211,6 +241,20 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     setPermissionGranted(true);
     attach();
     calibrate();
+
+    // If we got permission but no events arrive, tell the user what to toggle.
+    const startedAt = Date.now();
+    window.setTimeout(() => {
+      if (lockedRef.current) return;
+      if (Date.now() - startedAt < 800) return;
+      if (!lastEventAtRef.current || Date.now() - lastEventAtRef.current > 1200) {
+        setPermissionError(
+          "Датчики не отдают события. Откройте именно Safari (не встроенный браузер) и включите Motion & Orientation Access для сайта."
+        );
+        setState("idle");
+        setPermissionGranted(false);
+      }
+    }, 1400);
   }, [attach, calibrate, sensorAvailable]);
 
   const reset = useCallback(() => {
