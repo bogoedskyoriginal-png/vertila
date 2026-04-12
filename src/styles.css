@@ -30,6 +30,10 @@ body {
   height: 100svh;
 }
 
+.noScroll {
+  overflow: hidden;
+}
+
 button,
 input,
 select,
@@ -192,7 +196,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding-bottom: calc(78px + env(safe-area-inset-bottom));
 }
 
 .spectatorBar {
@@ -265,5 +269,10 @@ textarea {
 }
 
 .spectatorBottomBar {
-  padding: 10px 0 0 0;
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  max-width: 720px;
+  margin: 0 auto;
 }

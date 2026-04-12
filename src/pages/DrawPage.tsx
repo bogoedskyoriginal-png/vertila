@@ -80,6 +80,15 @@ export function DrawPage() {
     };
   }, [code]);
 
+  useEffect(() => {
+    document.documentElement.classList.add("noScroll");
+    document.body.classList.add("noScroll");
+    return () => {
+      document.documentElement.classList.remove("noScroll");
+      document.body.classList.remove("noScroll");
+    };
+  }, []);
+
   // Apply prediction drawing once after lock.
   useEffect(() => {
     async function apply() {
