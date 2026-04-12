@@ -15,7 +15,7 @@ export function MiniDrawingCanvas({ value, color, tool, onChange, height = 160 }
     color,
     tool,
     lineWidth: 5,
-    eraserWidth: 18
+    eraserWidth: 28
   });
 
   useEffect(() => {

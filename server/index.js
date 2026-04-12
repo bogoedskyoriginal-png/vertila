@@ -84,9 +84,10 @@ function normalizeConfig(input) {
         };
       }),
       motion: {
+        countdownSeconds: Number(input.motion?.countdownSeconds || DEFAULT_CONFIG.motion.countdownSeconds),
         calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
         motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
-        fastFlipMs: Number(DEFAULT_CONFIG.motion.fastFlipMs)
+        fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs)
       }
     };
   }
@@ -109,6 +110,7 @@ function normalizeConfig(input) {
       };
     }),
     motion: {
+      countdownSeconds: Number(input.motion?.countdownSeconds || DEFAULT_CONFIG.motion.countdownSeconds),
       calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
       motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
       fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs)
@@ -203,4 +205,3 @@ app.listen(port, () => {
   console.log(`server listening on :${port}`);
   console.log(`store file: ${store.filePath}`);
 });
-

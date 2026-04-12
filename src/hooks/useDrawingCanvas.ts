@@ -19,7 +19,7 @@ function getCanvasPoint(canvas: HTMLCanvasElement, clientX: number, clientY: num
   return { x, y };
 }
 
-export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWidth = 18 }: Options) {
+export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWidth = 28 }: Options) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
@@ -202,4 +202,3 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
     bindPointerHandlers
   };
 }
-

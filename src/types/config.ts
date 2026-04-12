@@ -13,6 +13,8 @@ export type PredictionItem = {
 };
 
 export type MotionConfig = {
+  // Countdown before calibration/arming (seconds).
+  countdownSeconds: number;
   // How long to sample a "resting" baseline after arming (ms).
   calibrationMs: number;
   // Delta magnitude threshold to start detecting a flip (m/s^2-ish units from devicemotion).
@@ -27,4 +29,3 @@ export type AppConfig = {
   predictions: PredictionItem[];
   motion: MotionConfig;
 };
-

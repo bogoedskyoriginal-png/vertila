@@ -90,6 +90,16 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   const listenerAttachedRef = useRef(false);
   const lockedRef = useRef(false);
 
+  const countdownTimerRef = useRef<number | null>(null);
+  const settleAndCalibrateTimerRef = useRef<number | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (countdownTimerRef.current) window.clearTimeout(countdownTimerRef.current);
+    if (settleAndCalibrateTimerRef.current) window.clearTimeout(settleAndCalibrateTimerRef.current);
+    countdownTimerRef.current = null;
+    settleAndCalibrateTimerRef.current = null;
+  }, []);
+
   // stateRef is used inside the motion handler without re-attaching the listener.
   const stateRef = useRef<MotionFlowState>(state);
   useEffect(() => {
@@ -207,7 +217,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     // Give a short "settle" window so the magician can put the phone face-down right after the double tap.
     calibrationCollectAfterRef.current = armedAtRef.current + 650;
 
-    window.setTimeout(() => {
+    settleAndCalibrateTimerRef.current = window.setTimeout(() => {
       const base = meanSample(samplesRef.current);
       baselineRef.current = base;
       samplesRef.current = [];
@@ -227,7 +237,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       return;
     }
 
-    if (lockedRef.current) return;
+    // Allow re-arming after a previous reveal.
+    lockedRef.current = false;
+    setResult(null);
+    clearTimers();
 
     if (isIossafariPermissionFlowSupported()) {
       setState("requestingPermission");
@@ -251,7 +264,11 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
     setPermissionGranted(true);
     attach();
-    calibrate();
+    setState("countdown");
+    const seconds = Math.max(1, Math.floor(Number(configRef.current.motion.countdownSeconds || 5)));
+    countdownTimerRef.current = window.setTimeout(() => {
+      calibrate();
+    }, seconds * 1000);
 
     // If we got permission but no events arrive, tell the user what to toggle.
     const startedAt = Date.now();
@@ -266,9 +283,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         setPermissionGranted(false);
       }
     }, 1400);
-  }, [attach, calibrate, sensorAvailable]);
+  }, [attach, calibrate, clearTimers, sensorAvailable]);
 
   const reset = useCallback(() => {
+    clearTimers();
     setPermissionError(null);
     setResult(null);
     baselineRef.current = null;
@@ -279,13 +297,14 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     peakDeltaRef.current = 0;
     lockedRef.current = false;
     setState("idle");
-  }, []);
+  }, [clearTimers]);
 
   useEffect(() => {
     return () => {
+      clearTimers();
       detach();
     };
-  }, [detach]);
+  }, [clearTimers, detach]);
 
   return {
     state,

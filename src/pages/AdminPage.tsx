@@ -130,17 +130,7 @@ export function AdminPage() {
         )}
       </div>
 
-      <Toolbar colors={COLORS} selectedColor={color} tool={tool} onSelectColor={setColor} onSelectTool={setTool} onClear={() => {
-        // In admin, "Очистить" clears all active predictions in current mode.
-        setRemote((prev) => {
-          const base = prev ?? DEFAULT_CONFIG;
-          const ids = predictionIdsForMode(base.mode);
-          return {
-            ...base,
-            predictions: base.predictions.map((p) => (ids.includes(p.id as any) ? { ...p, imageDataUrl: "" } : p))
-          };
-        });
-      }} />
+      <Toolbar colors={COLORS} selectedColor={color} tool={tool} onSelectColor={setColor} onSelectTool={setTool} />
 
       <div className="card" style={{ padding: 14, borderRadius: 16 }}>
         <div style={{ fontWeight: 900, marginBottom: 12 }}>Предсказания (рисунки)</div>
@@ -212,6 +202,23 @@ export function AdminPage() {
             }}
           >
             {saving ? "Сохранение…" : "Применить изменения"}
+          </button>
+
+          <button
+            className="btn"
+            disabled={saving || !!remoteError}
+            onClick={() => {
+              setRemote((prev) => {
+                const base = prev ?? DEFAULT_CONFIG;
+                const ids = predictionIdsForMode(base.mode);
+                return {
+                  ...base,
+                  predictions: base.predictions.map((p) => (ids.includes(p.id as any) ? { ...p, imageDataUrl: "" } : p))
+                };
+              });
+            }}
+          >
+            Очистить все
           </button>
 
           {savedAt && <div className="hint">Сохранено: {new Date(savedAt).toLocaleTimeString()}</div>}

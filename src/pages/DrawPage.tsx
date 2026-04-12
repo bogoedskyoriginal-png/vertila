@@ -137,7 +137,6 @@ export function DrawPage() {
         tool={tool}
         onSelectColor={setColor}
         onSelectTool={setTool}
-        onClear={() => canvasApi?.clear()}
       />
 
       <div

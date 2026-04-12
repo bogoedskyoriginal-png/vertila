@@ -6,10 +6,9 @@ type Props = {
   tool: DrawingTool;
   onSelectColor: (color: string) => void;
   onSelectTool: (tool: DrawingTool) => void;
-  onClear: () => void;
 };
 
-export function Toolbar({ colors, selectedColor, tool, onSelectColor, onSelectTool, onClear }: Props) {
+export function Toolbar({ colors, selectedColor, tool, onSelectColor, onSelectTool }: Props) {
   return (
     <div className="card" style={{ padding: 10, borderRadius: 16, marginBottom: 10 }}>
       <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
@@ -19,9 +18,6 @@ export function Toolbar({ colors, selectedColor, tool, onSelectColor, onSelectTo
           </button>
           <button className={tool === "eraser" ? "btn btnPrimary" : "btn"} onClick={() => onSelectTool("eraser")}>
             Ластик
-          </button>
-          <button className="btn" onClick={onClear}>
-            Очистить
           </button>
         </div>
 
@@ -64,4 +60,3 @@ export function Toolbar({ colors, selectedColor, tool, onSelectColor, onSelectTo
     </div>
   );
 }
-

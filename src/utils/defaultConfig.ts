@@ -27,9 +27,9 @@ export const DEFAULT_CONFIG: AppConfig = {
     imageDataUrl: ""
   })),
   motion: {
+    countdownSeconds: 5,
     calibrationMs: 350,
     motionThreshold: 3.5,
     fastFlipMs: 350
   }
 };
-

@@ -3,6 +3,7 @@ import type { Direction4, FlipSpeed, PredictionId } from "./config";
 export type MotionFlowState =
   | "idle"
   | "requestingPermission"
+  | "countdown"
   | "calibrating"
   | "armed"
   | "detecting"
@@ -21,4 +22,3 @@ export type MotionSample = {
   y: number;
   z: number;
 };
-
