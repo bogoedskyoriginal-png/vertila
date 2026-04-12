@@ -207,14 +207,13 @@ export function MasterPage() {
           ) : (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
-                <input
-                  value={newCode}
-                  onChange={(e) => setNewCode(normalizeCodeInput(e.target.value))}
-                  placeholder="Введите ID для создания ссылок"
-                  maxLength={10}
-                  className="masterInput"
-                  style={{ fontFamily: "ui-monospace" }}
-                />
+            <input
+              value={newCode}
+              onChange={(e) => setNewCode(normalizeCodeInput(e.target.value))}
+              placeholder="Введите ID для создания ссылок"
+              maxLength={10}
+              className="masterInput"
+            />
 
                 <div className="masterRow2">
                   <button
