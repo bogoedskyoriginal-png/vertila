@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
 
-const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
+const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
 function normalizeCode(code: string | undefined) {
   return String(code || "").trim().toUpperCase();
@@ -201,4 +201,3 @@ export function DrawPage() {
     </div>
   );
 }
-

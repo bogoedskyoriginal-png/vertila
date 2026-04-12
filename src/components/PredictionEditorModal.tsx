@@ -5,7 +5,7 @@ import type { DrawingTool } from "../hooks/useDrawingCanvas";
 import type { DrawingStroke, PredictionDrawing } from "../types/config";
 import { PaletteToolbar } from "./PaletteToolbar";
 
-const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a", "#000000"];
+const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
 type Props = {
   open: boolean;
@@ -166,4 +166,3 @@ export function PredictionEditorModal({ open, title, initial, onClose, onSave }:
     </div>
   );
 }
-
