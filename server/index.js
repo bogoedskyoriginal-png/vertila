@@ -93,7 +93,9 @@ function normalizeConfig(input) {
         countdownSeconds: Number(input.motion?.countdownSeconds || DEFAULT_CONFIG.motion.countdownSeconds),
         calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
         motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
-        fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs)
+        fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs),
+        mode8Strategy:
+          String(input.motion?.mode8Strategy || "") === "speed" ? "speed" : DEFAULT_CONFIG.motion.mode8Strategy
       }
     };
   }
@@ -124,7 +126,8 @@ function normalizeConfig(input) {
       countdownSeconds: Number(input.motion?.countdownSeconds || DEFAULT_CONFIG.motion.countdownSeconds),
       calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
       motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
-      fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs)
+      fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs),
+      mode8Strategy: String(input.motion?.mode8Strategy || "") === "speed" ? "speed" : DEFAULT_CONFIG.motion.mode8Strategy
     }
   };
 }

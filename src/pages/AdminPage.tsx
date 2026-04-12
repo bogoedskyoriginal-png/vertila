@@ -33,7 +33,18 @@ function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: P
   };
 }
 
-function labelForId(id: PredictionId) {
+function labelForId(id: PredictionId, mode8Strategy: "speed" | "tilts") {
+  if (mode8Strategy === "speed") {
+    if (id === 1) return "ВЕРХ (медленно)";
+    if (id === 2) return "ПРАВО (медленно)";
+    if (id === 3) return "НИЗ (медленно)";
+    if (id === 4) return "ЛЕВО (медленно)";
+    if (id === 5) return "ВЕРХ (быстро)";
+    if (id === 6) return "ПРАВО (быстро)";
+    if (id === 7) return "НИЗ (быстро)";
+    return "ЛЕВО (быстро)";
+  }
+
   if (id === 1) return "ВЕРХ (1 наклон)";
   if (id === 2) return "ПРАВО (1 наклон)";
   if (id === 3) return "НИЗ (1 наклон)";
@@ -53,13 +64,16 @@ export function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [openEditor, setOpenEditor] = useState<PredictionId | null>(null);
+
   const [templates, setTemplates] = useState<PredictionTemplate[]>(() => loadTemplates());
   const [templateName, setTemplateName] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const config = remote ?? DEFAULT_CONFIG;
+  const mode8Strategy: "speed" | "tilts" = config.motion?.mode8Strategy || "tilts";
   const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
   const predictionMap = useMemo(() => new Map(config.predictions.map((p) => [p.id, p])), [config.predictions]);
+
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId) ?? null,
     [selectedTemplateId, templates]
@@ -108,7 +122,7 @@ export function AdminPage() {
     return (
       <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelForId(id)}</div>
+          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelForId(id, mode8Strategy)}</div>
           <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
             Редактировать
           </button>
@@ -142,16 +156,56 @@ export function AdminPage() {
             <div className="hint">Режим</div>
             <button
               className={config.mode === 4 ? "btn btnPrimary" : "btn"}
-              onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), mode: 4 }))}
+              onClick={() =>
+                setRemote((prev) => ({
+                  ...(prev ?? DEFAULT_CONFIG),
+                  mode: 4
+                }))
+              }
             >
               4
             </button>
             <button
               className={config.mode === 8 ? "btn btnPrimary" : "btn"}
-              onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), mode: 8 }))}
+              onClick={() =>
+                setRemote((prev) => ({
+                  ...(prev ?? DEFAULT_CONFIG),
+                  mode: 8
+                }))
+              }
             >
               8
             </button>
+
+            {config.mode === 8 && (
+              <>
+                <div className="hint" style={{ marginLeft: 6 }}>
+                  8 исходов
+                </div>
+                <button
+                  className={mode8Strategy === "tilts" ? "btn btnPrimary" : "btn"}
+                  onClick={() =>
+                    setRemote((prev) => {
+                      const base = prev ?? DEFAULT_CONFIG;
+                      return { ...base, motion: { ...base.motion, mode8Strategy: "tilts" } };
+                    })
+                  }
+                >
+                  По наклонам
+                </button>
+                <button
+                  className={mode8Strategy === "speed" ? "btn btnPrimary" : "btn"}
+                  onClick={() =>
+                    setRemote((prev) => {
+                      const base = prev ?? DEFAULT_CONFIG;
+                      return { ...base, motion: { ...base.motion, mode8Strategy: "speed" } };
+                    })
+                  }
+                >
+                  По скорости
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -179,6 +233,7 @@ export function AdminPage() {
                   name,
                   createdAt: Date.now(),
                   mode: config.mode,
+                  mode8Strategy,
                   predictions: DEFAULT_CONFIG.predictions.map((base) => {
                     const prev = config.predictions.find((p) => p.id === base.id);
                     return {
@@ -228,13 +283,20 @@ export function AdminPage() {
                   return {
                     ...base,
                     mode: selectedTemplate.mode,
+                    motion: {
+                      ...base.motion,
+                      mode8Strategy: selectedTemplate.mode8Strategy || base.motion.mode8Strategy
+                    },
                     predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
                       const found = byId.get(pBase.id);
                       if (!found) return { ...pBase };
                       return {
                         ...pBase,
                         imageDataUrl: String(found.imageDataUrl || ""),
-                        drawing: found.drawing && found.drawing.v === 1 ? found.drawing : { v: 1, aspect: 9 / 16, strokes: [] }
+                        drawing:
+                          found.drawing && found.drawing.v === 1
+                            ? found.drawing
+                            : { v: 1, aspect: 9 / 16, strokes: [] }
                       };
                     })
                   };
@@ -281,6 +343,10 @@ export function AdminPage() {
               try {
                 const toSave: AppConfig = {
                   ...config,
+                  motion: {
+                    ...config.motion,
+                    mode8Strategy: config.motion?.mode8Strategy || "tilts"
+                  },
                   // Ensure predictions array is always 1..8
                   predictions: DEFAULT_CONFIG.predictions.map((base) => {
                     const prev = config.predictions.find((p) => p.id === base.id);
@@ -310,7 +376,7 @@ export function AdminPage() {
 
       <PredictionEditorModal
         open={openEditor !== null}
-        title={openEditor ? labelForId(openEditor) : ""}
+        title={openEditor ? labelForId(openEditor, mode8Strategy) : ""}
         initial={
           openEditor
             ? (config.predictions.find((p) => p.id === openEditor)?.drawing ?? { v: 1, aspect: 9 / 16, strokes: [] })
@@ -328,3 +394,4 @@ export function AdminPage() {
     </div>
   );
 }
+

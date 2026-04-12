@@ -98,6 +98,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
   const swingCountRef = useRef(0);
   const inSwingRef = useRef(false);
+  const flipStartAtRef = useRef<number | null>(null);
+  const flipSideRef = useRef<Direction4 | null>(null);
 
   const countdownTimerRef = useRef<number | null>(null);
   const settleAndCalibrateTimerRef = useRef<number | null>(null);
@@ -156,18 +158,52 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     const swingAngle = 30;
     const resetAngle = 14;
 
+    const mode = configRef.current.mode;
+    const strategy = configRef.current.motion?.mode8Strategy || "tilts";
+
+    // Mode=8 by speed: require a full flip, classify speed by duration.
+    if (mode === 8 && strategy === "speed") {
+      if (flipStartAtRef.current === null) {
+        if (angleDeg >= swingAngle) {
+          flipStartAtRef.current = t;
+          flipSideRef.current = side;
+        }
+      } else {
+        if (flipped) {
+          const durationMs = Math.max(0, nowMs() - flipStartAtRef.current);
+          const fastFlipMs = Math.max(120, Number(configRef.current.motion.fastFlipMs || 450));
+          const speed: FlipSpeed = durationMs <= fastFlipMs ? "fast" : "slow";
+          const finalSide = flipSideRef.current || side;
+          const predictionId = predictionIdFor(finalSide, speed, 8);
+
+          setResult({ side: finalSide, speed, durationMs, predictionId });
+          lockedRef.current = true;
+          setState("locked");
+          return;
+        }
+
+        // aborted flip
+        if (angleDeg <= resetAngle) {
+          flipStartAtRef.current = null;
+          flipSideRef.current = null;
+        }
+      }
+
+      return;
+    }
+
     // Swing detection with hysteresis: count excursions beyond swingAngle.
     if (!inSwingRef.current && angleDeg >= swingAngle) {
       inSwingRef.current = true;
       swingCountRef.current += 1;
 
       const count = swingCountRef.current;
-      const speed: FlipSpeed = configRef.current.mode === 8 && count >= 2 ? "fast" : "slow";
-      const predictionId = predictionIdFor(side, speed, configRef.current.mode);
+      const speed: FlipSpeed = mode === 8 && count >= 2 ? "fast" : "slow";
+      const predictionId = predictionIdFor(side, speed, mode);
 
       setResult({ side, speed, durationMs: 0, predictionId });
 
-      if (count >= 2 && configRef.current.mode === 8) {
+      if (count >= 2 && mode === 8) {
         lockedRef.current = true;
         setState("locked");
       } else {
@@ -205,6 +241,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     baselineUnitRef.current = null;
     swingCountRef.current = 0;
     inSwingRef.current = false;
+    flipStartAtRef.current = null;
+    flipSideRef.current = null;
     lockedRef.current = false;
     setResult(null);
 
@@ -242,6 +280,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     lockedRef.current = false;
     swingCountRef.current = 0;
     inSwingRef.current = false;
+    flipStartAtRef.current = null;
+    flipSideRef.current = null;
     setResult(null);
     clearTimers();
 
@@ -295,6 +335,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     samplesRef.current = [];
     swingCountRef.current = 0;
     inSwingRef.current = false;
+    flipStartAtRef.current = null;
+    flipSideRef.current = null;
     lockedRef.current = false;
     setState("idle");
   }, [clearTimers]);

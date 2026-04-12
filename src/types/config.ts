@@ -41,6 +41,8 @@ export type MotionConfig = {
   motionThreshold: number;
   // Flip duration <= fastFlipMs is considered "fast" (for mode=8).
   fastFlipMs: number;
+  // For mode=8: either distinguish outcomes by flip speed, or by 1/2 tilts.
+  mode8Strategy: "speed" | "tilts";
 };
 
 export type AppConfig = {

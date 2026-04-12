@@ -6,6 +6,7 @@ export type PredictionTemplate = {
   name: string;
   createdAt: number;
   mode: AppMode;
+  mode8Strategy?: "speed" | "tilts";
   predictions: Array<{
     id: PredictionId;
     drawing: PredictionDrawing;
