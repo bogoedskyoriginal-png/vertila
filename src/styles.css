@@ -43,6 +43,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .row {
@@ -134,6 +135,9 @@ textarea {
   grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(220px, 1fr);
   gap: 12px;
   align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .adminTop {
@@ -165,4 +169,12 @@ textarea {
   .adminMiddleRow {
     grid-row: auto;
   }
+}
+
+.adminSideGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
 }

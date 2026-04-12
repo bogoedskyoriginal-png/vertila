@@ -93,7 +93,7 @@ export function AdminPage() {
     if (!p || !activeIds.includes(id)) return null;
 
     return (
-      <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, flex: "1 1 220px" }}>
+      <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
           <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
           <button
@@ -120,7 +120,7 @@ export function AdminPage() {
     return (
       <div className="card" style={{ padding: 12, borderRadius: 16 }}>
         <div style={{ fontWeight: 900, marginBottom: 10 }}>{title}</div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{ids.map((id) => renderPredictionCell(id))}</div>
+        <div className="adminSideGrid">{ids.map((id) => renderPredictionCell(id))}</div>
       </div>
     );
   }
