@@ -128,3 +128,41 @@ textarea {
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
 }
+
+.adminCross {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(220px, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.adminTop {
+  grid-column: 2;
+}
+.adminLeft {
+  grid-column: 1;
+}
+.adminRight {
+  grid-column: 3;
+}
+.adminBottom {
+  grid-column: 2;
+}
+.adminMiddleRow {
+  grid-row: 2;
+}
+
+@media (max-width: 860px) {
+  .adminCross {
+    grid-template-columns: 1fr;
+  }
+  .adminTop,
+  .adminLeft,
+  .adminRight,
+  .adminBottom {
+    grid-column: 1;
+  }
+  .adminMiddleRow {
+    grid-row: auto;
+  }
+}

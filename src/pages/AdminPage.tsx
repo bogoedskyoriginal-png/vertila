@@ -79,21 +79,51 @@ export function AdminPage() {
     };
   }, [code]);
 
-  const layout = useMemo(() => {
-    if (config.mode === 4) {
-      return [
-        [null, 1, null],
-        [4, null, 2],
-        [null, 3, null]
-      ] as Array<Array<PredictionId | null>>;
-    }
-    // mode=8: two columns per side (slow/fast). Layout is still "cross", but with paired cells.
-    return [
-      [null, 1, 5, null],
-      [4, 8, null, 2],
-      [null, 3, 7, null]
-    ] as Array<Array<PredictionId | null>>;
+  const sideIds = useMemo(() => {
+    return {
+      top: config.mode === 8 ? ([1, 5] as const) : ([1] as const),
+      right: config.mode === 8 ? ([2, 6] as const) : ([2] as const),
+      bottom: config.mode === 8 ? ([3, 7] as const) : ([3] as const),
+      left: config.mode === 8 ? ([4, 8] as const) : ([4] as const)
+    };
   }, [config.mode]);
+
+  function renderPredictionCell(id: PredictionId) {
+    const p = predictionMap.get(id);
+    if (!p || !activeIds.includes(id)) return null;
+
+    return (
+      <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, flex: "1 1 220px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
+          <button
+            className="btn"
+            onClick={() => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, ""))}
+            style={{ padding: "6px 10px", minHeight: 38 }}
+          >
+            Очистить
+          </button>
+        </div>
+
+        <MiniDrawingCanvas
+          value={p.imageDataUrl}
+          color={color}
+          tool={tool}
+          onChange={(dataUrl) => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, dataUrl))}
+          height={170}
+        />
+      </div>
+    );
+  }
+
+  function renderSideCard(title: string, ids: readonly PredictionId[]) {
+    return (
+      <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+        <div style={{ fontWeight: 900, marginBottom: 10 }}>{title}</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{ids.map((id) => renderPredictionCell(id))}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page" style={{ maxWidth: 980, margin: "0 auto" }}>
@@ -135,45 +165,11 @@ export function AdminPage() {
       <div className="card" style={{ padding: 14, borderRadius: 16 }}>
         <div style={{ fontWeight: 900, marginBottom: 12 }}>Предсказания (рисунки)</div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${layout[0]?.length || 3}, minmax(0, 1fr))`,
-            gap: 12,
-            alignItems: "stretch"
-          }}
-        >
-          {layout.flatMap((row, rowIdx) =>
-            row.map((id, colIdx) => {
-              if (!id) return <div key={`${rowIdx}-${colIdx}`} />;
-
-              const p = predictionMap.get(id);
-              if (!p || !activeIds.includes(id)) return <div key={`${rowIdx}-${colIdx}`} />;
-
-              return (
-                <div key={`${rowIdx}-${colIdx}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelRuForId(id)}</div>
-                    <button
-                      className="btn"
-                      onClick={() => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, ""))}
-                      style={{ padding: "6px 10px" }}
-                    >
-                      Очистить
-                    </button>
-                  </div>
-
-                  <MiniDrawingCanvas
-                    value={p.imageDataUrl}
-                    color={color}
-                    tool={tool}
-                    onChange={(dataUrl) => setRemote((prev) => updatePredictionImage(prev ?? DEFAULT_CONFIG, id, dataUrl))}
-                    height={170}
-                  />
-                </div>
-              );
-            })
-          )}
+        <div className="adminCross">
+          <div className="adminTop">{renderSideCard("Верх", sideIds.top)}</div>
+          <div className="adminLeft adminMiddleRow">{renderSideCard("Лево", sideIds.left)}</div>
+          <div className="adminRight adminMiddleRow">{renderSideCard("Право", sideIds.right)}</div>
+          <div className="adminBottom">{renderSideCard("Низ", sideIds.bottom)}</div>
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14, alignItems: "center" }}>
