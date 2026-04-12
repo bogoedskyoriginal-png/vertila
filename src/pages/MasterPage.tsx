@@ -41,8 +41,15 @@ export function MasterPage() {
 
   async function refresh() {
     if (!auth) return;
-    const data = await apiGet<MasterListUsersResponse>("/api/master/users", { headers: auth });
-    setUsers(data.users);
+    try {
+      const data = await apiGet<MasterListUsersResponse>("/api/master/users", { headers: auth });
+      setUsers(data.users);
+      setError(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "load_failed";
+      setError(msg === "API 401" ? "Неверный логин/пароль мастер‑админки." : msg);
+      setUsers([]);
+    }
   }
 
   useEffect(() => {
@@ -65,7 +72,7 @@ export function MasterPage() {
     setCreatedCode(null);
     setUsers([]);
     if (!auth) return;
-    refresh().catch((e) => setError(e instanceof Error ? e.message : "load_failed"));
+    refresh().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.Authorization]);
 
@@ -158,7 +165,8 @@ export function MasterPage() {
                   setNewCode("");
                   await refresh();
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : "create_failed");
+                  const msg = e instanceof Error ? e.message : "create_failed";
+                  setError(msg === "API 401" ? "Неверный логин/пароль мастер‑админки." : msg);
                 }
               }}
               style={{
@@ -348,4 +356,3 @@ export function MasterPage() {
     </div>
   );
 }
-

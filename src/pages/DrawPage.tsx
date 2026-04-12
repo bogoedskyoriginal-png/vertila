@@ -56,7 +56,13 @@ export function DrawPage() {
         setRemoteConfig(data.config);
       } catch (e) {
         if (cancelled) return;
-        setRemoteError(e instanceof Error && e.message === "API 404" ? "Такой страницы не существует." : (e instanceof Error ? e.message : "load_failed"));
+        setRemoteError(
+          e instanceof Error && e.message === "API 404"
+            ? "Такой страницы не существует (ID не создан в мастер‑админке)."
+            : e instanceof Error
+              ? e.message
+              : "load_failed"
+        );
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -91,6 +97,10 @@ export function DrawPage() {
           <div className="card" style={{ padding: 14, borderRadius: 16 }}>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>Ошибка</div>
             <div className="hint">{remoteError}</div>
+            <div className="hint" style={{ marginTop: 10 }}>
+              Если вы ожидаете, что эта страница должна работать — сначала создайте ID в мастер‑админке и откройте ссылку
+              фокусника <span className="kbd">/{code}/admin</span>.
+            </div>
           </div>
         </div>
       );
@@ -116,12 +126,12 @@ export function DrawPage() {
     <div
       className="page"
       style={{ maxWidth: 720, margin: "0 auto" }}
-      onPointerDown={async () => {
+      onPointerDown={() => {
         const now = Date.now();
         if (isDoubleTap(lastTapAtRef.current, now)) {
           lastTapAtRef.current = 0;
           revealAppliedRef.current = false;
-          await motion.arm();
+          void motion.arm();
         } else {
           lastTapAtRef.current = now;
         }
@@ -147,4 +157,3 @@ export function DrawPage() {
     </div>
   );
 }
-

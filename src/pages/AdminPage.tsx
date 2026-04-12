@@ -64,7 +64,13 @@ export function AdminPage() {
         setRemote(data.config);
       } catch (e) {
         if (cancelled) return;
-        setRemoteError(e instanceof Error && e.message === "API 404" ? "Такого пользователя нет." : (e instanceof Error ? e.message : "load_failed"));
+        setRemoteError(
+          e instanceof Error && e.message === "API 404"
+            ? "Такого пользователя нет (ID не создан в мастер‑админке)."
+            : e instanceof Error
+              ? e.message
+              : "load_failed"
+        );
       }
     }
     if (code) load();
@@ -218,4 +224,3 @@ export function AdminPage() {
     </div>
   );
 }
-

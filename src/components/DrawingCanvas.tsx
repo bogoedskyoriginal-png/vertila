@@ -54,8 +54,14 @@ export function DrawingCanvas({
       <canvas
         ref={canvasRef}
         {...bindPointerHandlers}
-        onPointerUp={() => onStrokeEnd?.()}
-        onPointerCancel={() => onStrokeEnd?.()}
+        onPointerUp={(e) => {
+          bindPointerHandlers.onPointerUp?.(e as any);
+          onStrokeEnd?.();
+        }}
+        onPointerCancel={(e) => {
+          bindPointerHandlers.onPointerCancel?.(e as any);
+          onStrokeEnd?.();
+        }}
         style={{
           display: "block",
           width: "100%",
@@ -66,4 +72,3 @@ export function DrawingCanvas({
     </div>
   );
 }
-

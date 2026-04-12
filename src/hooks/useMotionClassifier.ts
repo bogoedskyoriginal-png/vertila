@@ -197,13 +197,13 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         if (res !== "granted") {
           setState("idle");
           setPermissionGranted(false);
-          setPermissionError("Доступ к датчикам не разрешён.");
+          setPermissionError("Доступ к датчикам не разрешён (в Safari откройте настройки сайта и разрешите Motion).");
           return;
         }
       } catch {
         setState("idle");
         setPermissionGranted(false);
-        setPermissionError("Не удалось запросить разрешение на датчики.");
+        setPermissionError("Не удалось запросить разрешение на датчики. Проверьте, что открыто по HTTPS в Safari (iPhone).");
         return;
       }
     }
