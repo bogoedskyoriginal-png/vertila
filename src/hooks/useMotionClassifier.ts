@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppConfig, Direction4, FlipSpeed, PredictionId } from "../types/config";
 import type { FlipResult, MotionFlowState, MotionSample } from "../types/motion";
-import { dominantDirection4, meanSample } from "../utils/motionMath";
+import { dominantDirection4, mean, meanSample } from "../utils/motionMath";
 
 type Baseline = { x: number; y: number; z: number };
 
@@ -100,6 +100,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   const inSwingRef = useRef(false);
   const flipStartAtRef = useRef<number | null>(null);
   const flipSideRef = useRef<Direction4 | null>(null);
+  const flipSpeedRef = useRef<FlipSpeed | null>(null);
+  const flipDecidedRef = useRef(false);
+  const flipDxRef = useRef<number[]>([]);
+  const flipDyRef = useRef<number[]>([]);
 
   const countdownTimerRef = useRef<number | null>(null);
   const settleAndCalibrateTimerRef = useRef<number | null>(null);
@@ -163,17 +167,48 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
     // Mode=8 by speed: require a full flip, classify speed by duration.
     if (mode === 8 && strategy === "speed") {
+      // Decide speed early (near start of motion) to avoid any visible "switching" later.
+      const startAngle = 16;
+      const speedGateAngle = 28;
+      const fastStartMs = Math.max(120, Math.min(240, Number(configRef.current.motion.fastFlipMs || 450) * 0.35));
+
       if (flipStartAtRef.current === null) {
-        if (angleDeg >= swingAngle) {
+        if (angleDeg >= startAngle) {
           flipStartAtRef.current = t;
-          flipSideRef.current = side;
+          flipSideRef.current = null;
+          flipSpeedRef.current = null;
+          flipDecidedRef.current = false;
+          flipDxRef.current = [];
+          flipDyRef.current = [];
         }
       } else {
+        flipDxRef.current.push(dx);
+        flipDyRef.current.push(dy);
+
+        if (!flipDecidedRef.current && angleDeg >= speedGateAngle) {
+          const dt = Math.max(0, t - flipStartAtRef.current);
+          const speed: FlipSpeed = dt <= fastStartMs ? "fast" : "slow";
+          const mx = mean(flipDxRef.current);
+          const my = mean(flipDyRef.current);
+          flipSideRef.current = dominantDirection4(mx, my);
+          flipSpeedRef.current = speed;
+          flipDecidedRef.current = true;
+        }
+
         if (flipped) {
-          const durationMs = Math.max(0, nowMs() - flipStartAtRef.current);
+          const durationMs = Math.max(0, t - flipStartAtRef.current);
           const fastFlipMs = Math.max(120, Number(configRef.current.motion.fastFlipMs || 450));
-          const speed: FlipSpeed = durationMs <= fastFlipMs ? "fast" : "slow";
+
+          if (!flipDecidedRef.current) {
+            const mx = mean(flipDxRef.current);
+            const my = mean(flipDyRef.current);
+            flipSideRef.current = dominantDirection4(mx, my);
+            flipSpeedRef.current = durationMs <= fastFlipMs ? "fast" : "slow";
+            flipDecidedRef.current = true;
+          }
+
           const finalSide = flipSideRef.current || side;
+          const speed = flipSpeedRef.current || (durationMs <= fastFlipMs ? "fast" : "slow");
           const predictionId = predictionIdFor(finalSide, speed, 8);
 
           setResult({ side: finalSide, speed, durationMs, predictionId });
@@ -186,6 +221,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         if (angleDeg <= resetAngle) {
           flipStartAtRef.current = null;
           flipSideRef.current = null;
+          flipSpeedRef.current = null;
+          flipDecidedRef.current = false;
+          flipDxRef.current = [];
+          flipDyRef.current = [];
         }
       }
 
@@ -243,6 +282,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     inSwingRef.current = false;
     flipStartAtRef.current = null;
     flipSideRef.current = null;
+    flipSpeedRef.current = null;
+    flipDecidedRef.current = false;
+    flipDxRef.current = [];
+    flipDyRef.current = [];
     lockedRef.current = false;
     setResult(null);
 
@@ -282,6 +325,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     inSwingRef.current = false;
     flipStartAtRef.current = null;
     flipSideRef.current = null;
+    flipSpeedRef.current = null;
+    flipDecidedRef.current = false;
+    flipDxRef.current = [];
+    flipDyRef.current = [];
     setResult(null);
     clearTimers();
 
@@ -337,6 +384,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     inSwingRef.current = false;
     flipStartAtRef.current = null;
     flipSideRef.current = null;
+    flipSpeedRef.current = null;
+    flipDecidedRef.current = false;
+    flipDxRef.current = [];
+    flipDyRef.current = [];
     lockedRef.current = false;
     setState("idle");
   }, [clearTimers]);
