@@ -142,6 +142,7 @@ textarea {
 .adminCross {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(220px, 1fr);
+  grid-template-rows: auto auto auto;
   gap: 12px;
   align-items: stretch;
   width: 100%;
@@ -151,31 +152,31 @@ textarea {
 
 .adminTop {
   grid-column: 2;
+  grid-row: 1;
 }
 .adminLeft {
   grid-column: 1;
+  grid-row: 2;
 }
 .adminRight {
   grid-column: 3;
+  grid-row: 2;
 }
 .adminBottom {
   grid-column: 2;
-}
-.adminMiddleRow {
-  grid-row: 2;
+  grid-row: 3;
 }
 
 @media (max-width: 860px) {
   .adminCross {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
   .adminTop,
   .adminLeft,
   .adminRight,
   .adminBottom {
     grid-column: 1;
-  }
-  .adminMiddleRow {
     grid-row: auto;
   }
 }
@@ -199,6 +200,81 @@ textarea {
   .adminLayoutGrid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Magician admin (dark) */
+.adminRoot {
+  min-height: 100vh;
+  background: #050507;
+  color: #fff;
+}
+
+.adminRoot .card {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+}
+
+.adminRoot .hint {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.adminRoot .kbd {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.adminRoot .btn {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: #fff;
+}
+
+.adminRoot .btnPrimary {
+  background: #fff;
+  color: #050507;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.adminRoot .btnDanger {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.adminRoot .input,
+.adminRoot .select,
+.adminRoot .textarea {
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.segmentedOneCol {
+  grid-template-columns: 1fr;
+}
+
+.segBtn {
+  min-height: 46px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.segBtnActive {
+  background: #fff;
+  color: #050507;
 }
 
 /* Spectator drawing UI */
