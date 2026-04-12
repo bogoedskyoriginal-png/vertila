@@ -24,9 +24,14 @@ function normalizeCode(code) {
 
 function isValidCode(code) {
   if (!code) return false;
-  if (code.length !== 5) return false;
+  if (code.length < 2 || code.length > 10) return false;
   // a-z, 0-9 only (case-insensitive)
-  return /^[A-Z0-9]{5}$/.test(code);
+  return /^[A-Z0-9]{2,10}$/.test(code);
+}
+
+function isReservedCode(code) {
+  const c = normalizeCode(code);
+  return c === "MASTER" || c === "API";
 }
 
 function requireMaster(req, res) {
@@ -145,6 +150,7 @@ app.post("/api/master/users", async (req, res) => {
   let code = normalizeCode(req.body?.code);
   if (code) {
     if (!isValidCode(code)) return res.status(400).json({ error: "invalid_code" });
+    if (isReservedCode(code)) return res.status(400).json({ error: "reserved_code" });
     if (store.getUser(code)) return res.status(409).json({ error: "already_exists" });
   } else {
     code = makeUserCode(5);
