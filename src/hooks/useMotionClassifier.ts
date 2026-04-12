@@ -163,7 +163,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     const resetAngle = 14;
 
     const mode = configRef.current.mode;
-    const strategy = configRef.current.motion?.mode8Strategy || "tilts";
+    const outputMode = configRef.current.outputMode || "drawings";
+    const strategy = outputMode === "links" ? "tilts" : configRef.current.motion?.mode8Strategy || "tilts";
 
     // Mode=8 by speed: require a full flip, classify speed by duration.
     if (mode === 8 && strategy === "speed") {
@@ -256,7 +257,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
       setResult({ side, speed, durationMs: 0, predictionId });
 
-      if (count >= 2 && mode === 8) {
+      if (outputMode === "links" && mode === 4) {
+        lockedRef.current = true;
+        setState("locked");
+      } else if (count >= 2 && mode === 8) {
         lockedRef.current = true;
         setState("locked");
       } else {

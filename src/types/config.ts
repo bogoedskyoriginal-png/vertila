@@ -5,11 +5,15 @@ export type FlipSpeed = "slow" | "fast";
 
 export type PredictionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+export type OutputMode = "drawings" | "links";
+
 export type PredictionItem = {
   id: PredictionId;
   label: string;
   // PNG data URL. Empty string = not set yet.
   imageDataUrl: string;
+  // Link-mode: query for Google Images (or full https:// URL).
+  linkQuery?: string;
   // Vector strokes to render prediction at any size (prevents pixelation).
   drawing?: PredictionDrawing;
 };
@@ -48,6 +52,7 @@ export type MotionConfig = {
 export type AppConfig = {
   version: 2;
   mode: AppMode;
+  outputMode: OutputMode;
   predictions: PredictionItem[];
   motion: MotionConfig;
 };

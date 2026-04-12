@@ -7,10 +7,12 @@ export type PredictionTemplate = {
   createdAt: number;
   mode: AppMode;
   mode8Strategy?: "speed" | "tilts";
+  outputMode?: "drawings" | "links";
   predictions: Array<{
     id: PredictionId;
     drawing: PredictionDrawing;
     imageDataUrl: string;
+    linkQuery?: string;
   }>;
 };
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { AppConfig, AppMode, PredictionDrawing, PredictionId } from "../types/config";
+import type { AppConfig, AppMode, OutputMode, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
@@ -33,8 +33,15 @@ function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: P
   };
 }
 
-function labelForId(id: PredictionId, mode8Strategy: "speed" | "tilts") {
-  if (mode8Strategy === "speed") {
+function updatePredictionLinkQuery(config: AppConfig, id: PredictionId, linkQuery: string): AppConfig {
+  return {
+    ...config,
+    predictions: config.predictions.map((p) => (p.id === id ? { ...p, linkQuery } : p))
+  };
+}
+
+function labelForId(id: PredictionId, strategy: "speed" | "tilts") {
+  if (strategy === "speed") {
     if (id === 1) return "ВЕРХ (медленно)";
     if (id === 2) return "ПРАВО (медленно)";
     if (id === 3) return "НИЗ (медленно)";
@@ -70,7 +77,7 @@ export function AdminPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const config = remote ?? DEFAULT_CONFIG;
-  const mode8Strategy: "speed" | "tilts" = config.motion?.mode8Strategy || "tilts";
+  const outputMode: OutputMode = config.outputMode || "drawings";
   const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
   const predictionMap = useMemo(() => new Map(config.predictions.map((p) => [p.id, p])), [config.predictions]);
 
@@ -78,6 +85,9 @@ export function AdminPage() {
     () => templates.find((t) => t.id === selectedTemplateId) ?? null,
     [selectedTemplateId, templates]
   );
+
+  const effectiveStrategy: "speed" | "tilts" =
+    outputMode === "links" ? "tilts" : config.motion?.mode8Strategy || "tilts";
 
   useEffect(() => {
     let cancelled = false;
@@ -122,12 +132,25 @@ export function AdminPage() {
     return (
       <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelForId(id, mode8Strategy)}</div>
-          <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
-            Редактировать
-          </button>
+          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 0.6 }}>{labelForId(id, effectiveStrategy)}</div>
+          {outputMode === "drawings" ? (
+            <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
+              Редактировать
+            </button>
+          ) : null}
         </div>
-        <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
+
+        {outputMode === "drawings" ? (
+          <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
+        ) : (
+          <input
+            className="input"
+            value={String(p.linkQuery || "")}
+            onChange={(e) => setRemote((prev) => updatePredictionLinkQuery(prev ?? DEFAULT_CONFIG, id, e.target.value))}
+            placeholder="Запрос для Google Картинок"
+            style={{ minHeight: 46 }}
+          />
+        )}
       </div>
     );
   }
@@ -142,7 +165,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: 980, margin: "0 auto" }}>
+    <div className="page" style={{ maxWidth: 1160, margin: "0 auto" }}>
       <div className="card" style={{ padding: 14, borderRadius: 16, marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
           <div>
@@ -151,78 +174,117 @@ export function AdminPage() {
               ID: <span className="kbd">{code}</span>
             </div>
           </div>
+          {remoteError && <div style={{ color: "#b91c1c", fontWeight: 700, alignSelf: "center" }}>{remoteError}</div>}
+        </div>
+      </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <div className="hint">Режим</div>
-            <button
-              className={config.mode === 4 ? "btn btnPrimary" : "btn"}
-              onClick={() =>
-                setRemote((prev) => ({
-                  ...(prev ?? DEFAULT_CONFIG),
-                  mode: 4
-                }))
-              }
-            >
-              4
-            </button>
-            <button
-              className={config.mode === 8 ? "btn btnPrimary" : "btn"}
-              onClick={() =>
-                setRemote((prev) => ({
-                  ...(prev ?? DEFAULT_CONFIG),
-                  mode: 8
-                }))
-              }
-            >
-              8
-            </button>
+      <div className="adminLayoutGrid">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+          <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+            <div className="hint" style={{ fontWeight: 900, marginBottom: 8 }}>
+              Вывод
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+              <button
+                className={outputMode === "drawings" ? "btn btnPrimary" : "btn"}
+                disabled={!!remoteError}
+                onClick={() =>
+                  setRemote((prev) => ({
+                    ...(prev ?? DEFAULT_CONFIG),
+                    outputMode: "drawings"
+                  }))
+                }
+              >
+                Рисунки
+              </button>
+              <button
+                className={outputMode === "links" ? "btn btnPrimary" : "btn"}
+                disabled={!!remoteError}
+                onClick={() =>
+                  setRemote((prev) => {
+                    const base = prev ?? DEFAULT_CONFIG;
+                    // Link-mode uses tilts only.
+                    return {
+                      ...base,
+                      outputMode: "links",
+                      motion: { ...base.motion, mode8Strategy: "tilts" }
+                    };
+                  })
+                }
+              >
+                Ссылки
+              </button>
+            </div>
+          </div>
 
-            {config.mode === 8 && (
+          <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+            <div className="hint" style={{ fontWeight: 900, marginBottom: 8 }}>
+              Режим
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <button
+                className={config.mode === 4 ? "btn btnPrimary" : "btn"}
+                disabled={!!remoteError}
+                onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), mode: 4 }))}
+              >
+                4
+              </button>
+              <button
+                className={config.mode === 8 ? "btn btnPrimary" : "btn"}
+                disabled={!!remoteError}
+                onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), mode: 8 }))}
+              >
+                8
+              </button>
+            </div>
+
+            {config.mode === 8 && outputMode === "drawings" && (
               <>
-                <div className="hint" style={{ marginLeft: 6 }}>
+                <div className="hint" style={{ marginTop: 10 }}>
                   8 исходов
                 </div>
-                <button
-                  className={mode8Strategy === "tilts" ? "btn btnPrimary" : "btn"}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, motion: { ...base.motion, mode8Strategy: "tilts" } };
-                    })
-                  }
-                >
-                  По наклонам
-                </button>
-                <button
-                  className={mode8Strategy === "speed" ? "btn btnPrimary" : "btn"}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, motion: { ...base.motion, mode8Strategy: "speed" } };
-                    })
-                  }
-                >
-                  По скорости
-                </button>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+                  <button
+                    className={effectiveStrategy === "tilts" ? "btn btnPrimary" : "btn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, mode8Strategy: "tilts" } };
+                      })
+                    }
+                  >
+                    По наклонам
+                  </button>
+                  <button
+                    className={effectiveStrategy === "speed" ? "btn btnPrimary" : "btn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, mode8Strategy: "speed" } };
+                      })
+                    }
+                  >
+                    По скорости
+                  </button>
+                </div>
               </>
             )}
           </div>
-        </div>
 
-        {remoteError && <div style={{ marginTop: 10, color: "#b91c1c", fontWeight: 700 }}>{remoteError}</div>}
-      </div>
+          <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+            <div style={{ fontWeight: 900, marginBottom: 10 }}>Шаблоны</div>
 
-      <div className="card" style={{ padding: 14, borderRadius: 16, marginBottom: 10 }}>
-        <div style={{ fontWeight: 900, marginBottom: 12 }}>Шаблоны</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <input
               className="input"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="Название шаблона"
-              style={{ flex: "1 1 240px", minHeight: 46 }}
+              style={{ minHeight: 46 }}
             />
+            <div style={{ height: 10 }} />
+
             <button
               className="btn btnPrimary"
               disabled={!!remoteError || !templateName.trim()}
@@ -233,12 +295,14 @@ export function AdminPage() {
                   name,
                   createdAt: Date.now(),
                   mode: config.mode,
-                  mode8Strategy,
+                  mode8Strategy: effectiveStrategy,
+                  outputMode,
                   predictions: DEFAULT_CONFIG.predictions.map((base) => {
                     const prev = config.predictions.find((p) => p.id === base.id);
                     return {
                       id: base.id,
                       imageDataUrl: String(prev?.imageDataUrl || ""),
+                      linkQuery: String(prev?.linkQuery || ""),
                       drawing:
                         prev?.drawing && prev.drawing.v === 1
                           ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
@@ -247,30 +311,31 @@ export function AdminPage() {
                   })
                 };
                 addTemplate(t);
-                const next = loadTemplates();
-                setTemplates(next);
+                setTemplates(loadTemplates());
                 setSelectedTemplateId(t.id);
                 setTemplateName("");
               }}
             >
-              Сохранить как шаблон
+              Сохранить
             </button>
-          </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ height: 10 }} />
+
             <select
               className="select"
               value={selectedTemplateId}
               onChange={(e) => setSelectedTemplateId(e.target.value)}
-              style={{ flex: "1 1 320px", minHeight: 46 }}
+              style={{ minHeight: 46 }}
             >
-              <option value="">— выбрать шаблон —</option>
+              <option value="">— выбрать —</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} ({t.mode})
+                  {t.name}
                 </option>
               ))}
             </select>
+
+            <div style={{ height: 10 }} />
 
             <button
               className="btn"
@@ -280,19 +345,25 @@ export function AdminPage() {
                 setRemote((prev) => {
                   const base = prev ?? DEFAULT_CONFIG;
                   const byId = new Map(selectedTemplate.predictions.map((p) => [p.id, p]));
+                  const nextOutput: OutputMode = selectedTemplate.outputMode || "drawings";
+                  const nextStrategy: "speed" | "tilts" =
+                    nextOutput === "links" ? "tilts" : selectedTemplate.mode8Strategy || base.motion.mode8Strategy;
+
                   return {
                     ...base,
                     mode: selectedTemplate.mode,
+                    outputMode: nextOutput,
                     motion: {
                       ...base.motion,
-                      mode8Strategy: selectedTemplate.mode8Strategy || base.motion.mode8Strategy
+                      mode8Strategy: nextStrategy
                     },
                     predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
                       const found = byId.get(pBase.id);
-                      if (!found) return { ...pBase };
+                      if (!found) return { ...pBase, linkQuery: "" };
                       return {
                         ...pBase,
                         imageDataUrl: String(found.imageDataUrl || ""),
+                        linkQuery: String(found.linkQuery || ""),
                         drawing:
                           found.drawing && found.drawing.v === 1
                             ? found.drawing
@@ -303,8 +374,10 @@ export function AdminPage() {
                 });
               }}
             >
-              Применить шаблон
+              Применить
             </button>
+
+            <div style={{ height: 10 }} />
 
             <button
               className="btn btnDanger"
@@ -313,8 +386,7 @@ export function AdminPage() {
                 if (!selectedTemplate) return;
                 if (!confirm(`Удалить шаблон “${selectedTemplate.name}”?`)) return;
                 deleteTemplate(selectedTemplate.id);
-                const next = loadTemplates();
-                setTemplates(next);
+                setTemplates(loadTemplates());
                 setSelectedTemplateId("");
               }}
             >
@@ -322,61 +394,64 @@ export function AdminPage() {
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="card" style={{ padding: 14, borderRadius: 16 }}>
-        <div style={{ fontWeight: 900, marginBottom: 12 }}>Предсказания (рисунки)</div>
+        <div className="card" style={{ padding: 14, borderRadius: 16 }}>
+          <div style={{ fontWeight: 900, marginBottom: 12 }}>
+            {outputMode === "drawings" ? "Предсказания (рисунки)" : "Предсказания (запросы)"}
+          </div>
 
-        <div className="adminCross">
-          <div className="adminTop">{renderSideCard("Верх", sideIds.top)}</div>
-          <div className="adminLeft adminMiddleRow">{renderSideCard("Лево", sideIds.left)}</div>
-          <div className="adminRight adminMiddleRow">{renderSideCard("Право", sideIds.right)}</div>
-          <div className="adminBottom">{renderSideCard("Низ", sideIds.bottom)}</div>
-        </div>
+          <div className="adminCross">
+            <div className="adminTop">{renderSideCard("Верх", sideIds.top)}</div>
+            <div className="adminLeft adminMiddleRow">{renderSideCard("Лево", sideIds.left)}</div>
+            <div className="adminRight adminMiddleRow">{renderSideCard("Право", sideIds.right)}</div>
+            <div className="adminBottom">{renderSideCard("Низ", sideIds.bottom)}</div>
+          </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14, alignItems: "center" }}>
-          <button
-            className="btn btnPrimary"
-            disabled={saving || !!remoteError}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                const toSave: AppConfig = {
-                  ...config,
-                  motion: {
-                    ...config.motion,
-                    mode8Strategy: config.motion?.mode8Strategy || "tilts"
-                  },
-                  // Ensure predictions array is always 1..8
-                  predictions: DEFAULT_CONFIG.predictions.map((base) => {
-                    const prev = config.predictions.find((p) => p.id === base.id);
-                    return {
-                      ...base,
-                      imageDataUrl: String(prev?.imageDataUrl || ""),
-                      drawing:
-                        prev?.drawing && prev.drawing.v === 1
-                          ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
-                          : { v: 1, aspect: 9 / 16, strokes: [] }
-                    };
-                  })
-                };
-                await apiSend(`/api/users/${encodeURIComponent(code)}/config`, "PUT", { config: toSave });
-                setSavedAt(Date.now());
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            {saving ? "Сохранение…" : "Применить изменения"}
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14, alignItems: "center" }}>
+            <button
+              className="btn btnPrimary"
+              disabled={saving || !!remoteError}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  const toSave: AppConfig = {
+                    ...config,
+                    outputMode,
+                    motion: {
+                      ...config.motion,
+                      mode8Strategy: effectiveStrategy
+                    },
+                    predictions: DEFAULT_CONFIG.predictions.map((base) => {
+                      const prev = config.predictions.find((p) => p.id === base.id);
+                      return {
+                        ...base,
+                        imageDataUrl: String(prev?.imageDataUrl || ""),
+                        linkQuery: String(prev?.linkQuery || ""),
+                        drawing:
+                          prev?.drawing && prev.drawing.v === 1
+                            ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
+                            : { v: 1, aspect: 9 / 16, strokes: [] }
+                      };
+                    })
+                  };
+                  await apiSend(`/api/users/${encodeURIComponent(code)}/config`, "PUT", { config: toSave });
+                  setSavedAt(Date.now());
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              {saving ? "Сохранение…" : "Применить изменения"}
+            </button>
 
-          {savedAt && <div className="hint">Сохранено: {new Date(savedAt).toLocaleTimeString()}</div>}
+            {savedAt && <div className="hint">Сохранено: {new Date(savedAt).toLocaleTimeString()}</div>}
+          </div>
         </div>
       </div>
 
       <PredictionEditorModal
         open={openEditor !== null}
-        title={openEditor ? labelForId(openEditor, mode8Strategy) : ""}
+        title={openEditor ? labelForId(openEditor, effectiveStrategy) : ""}
         initial={
           openEditor
             ? (config.predictions.find((p) => p.id === openEditor)?.drawing ?? { v: 1, aspect: 9 / 16, strokes: [] })
@@ -391,7 +466,7 @@ export function AdminPage() {
           setOpenEditor(null);
         }}
       />
+
     </div>
   );
 }
-
