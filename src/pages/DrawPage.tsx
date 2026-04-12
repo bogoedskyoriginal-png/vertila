@@ -123,20 +123,7 @@ export function DrawPage() {
   if (spectatorUi) return spectatorUi;
 
   return (
-    <div
-      className="page"
-      style={{ maxWidth: 720, margin: "0 auto" }}
-      onPointerDown={() => {
-        const now = Date.now();
-        if (isDoubleTap(lastTapAtRef.current, now)) {
-          lastTapAtRef.current = 0;
-          revealAppliedRef.current = false;
-          void motion.arm();
-        } else {
-          lastTapAtRef.current = now;
-        }
-      }}
-    >
+    <div className="page" style={{ maxWidth: 720, margin: "0 auto", paddingBottom: 84 }}>
       {motion.permissionError && (
         <div className="card" style={{ padding: 12, marginBottom: 10, borderColor: "rgba(185,28,28,0.25)" }}>
           <div style={{ fontWeight: 900, color: "#b91c1c", marginBottom: 4 }}>Не удалось включить датчики</div>
@@ -153,7 +140,47 @@ export function DrawPage() {
         onClear={() => canvasApi?.clear()}
       />
 
-      <DrawingCanvas color={color} tool={tool} onReady={setCanvasApi} />
+      <div
+        onPointerDown={() => {
+          const now = Date.now();
+          if (isDoubleTap(lastTapAtRef.current, now)) {
+            lastTapAtRef.current = 0;
+            revealAppliedRef.current = false;
+            void motion.arm();
+          } else {
+            lastTapAtRef.current = now;
+          }
+        }}
+      >
+        <DrawingCanvas color={color} tool={tool} onReady={setCanvasApi} />
+      </div>
+
+      {/* Fallback: iOS permission can be finicky; a clear-looking button triggers sensor enable on click */}
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: 12,
+          background: "linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0.92), rgba(255,255,255,0))"
+        }}
+      >
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <button
+            className="btn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              revealAppliedRef.current = false;
+              void motion.arm();
+            }}
+            style={{ width: "100%", justifyContent: "center", fontWeight: 900 }}
+          >
+            Очистить
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
