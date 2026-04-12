@@ -168,9 +168,12 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     // Mode=8 by speed: require a full flip, classify speed by duration.
     if (mode === 8 && strategy === "speed") {
       // Decide speed early (near start of motion) to avoid any visible "switching" later.
-      const startAngle = 16;
-      const speedGateAngle = 28;
-      const fastStartMs = Math.max(120, Math.min(240, Number(configRef.current.motion.fastFlipMs || 450) * 0.35));
+      // Previous (for rollback): startAngle=16, decideAngle=28, fastStartMs≈fastFlipMs*0.35 (cap 240ms)
+      // New: decide around ~35–40° so the prediction appears earlier during the flip, not only at the very end.
+      const startAngle = 12;
+      const decideAngle = 38;
+      const fastStartMs = Math.max(110, Math.min(220, Number(configRef.current.motion.fastFlipMs || 450) * 0.30));
+      const slowMinMs = Math.max(fastStartMs + 70, Math.min(420, Number(configRef.current.motion.fastFlipMs || 450) * 0.55));
 
       if (flipStartAtRef.current === null) {
         if (angleDeg >= startAngle) {
@@ -185,14 +188,25 @@ export function useMotionClassifier(config: AppConfig): HookResult {
         flipDxRef.current.push(dx);
         flipDyRef.current.push(dy);
 
-        if (!flipDecidedRef.current && angleDeg >= speedGateAngle) {
+        if (!flipDecidedRef.current && angleDeg >= decideAngle) {
           const dt = Math.max(0, t - flipStartAtRef.current);
-          const speed: FlipSpeed = dt <= fastStartMs ? "fast" : "slow";
-          const mx = mean(flipDxRef.current);
-          const my = mean(flipDyRef.current);
-          flipSideRef.current = dominantDirection4(mx, my);
-          flipSpeedRef.current = speed;
-          flipDecidedRef.current = true;
+          // Stricter requirements:
+          // - dt <= fastStartMs => fast
+          // - dt >= slowMinMs  => slow
+          // - otherwise: keep waiting (prevents borderline flips from being mis-classified too early)
+          const speed: FlipSpeed | null = dt <= fastStartMs ? "fast" : dt >= slowMinMs ? "slow" : null;
+          if (speed) {
+            const mx = mean(flipDxRef.current);
+            const my = mean(flipDyRef.current);
+            flipSideRef.current = dominantDirection4(mx, my);
+            flipSpeedRef.current = speed;
+            flipDecidedRef.current = true;
+
+            const finalSide = flipSideRef.current;
+            const predictionId = predictionIdFor(finalSide, speed, 8);
+            setResult({ side: finalSide, speed, durationMs: dt, predictionId });
+            setState("preview");
+          }
         }
 
         if (flipped) {
