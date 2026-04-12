@@ -5,16 +5,11 @@ export type FlipSpeed = "slow" | "fast";
 
 export type PredictionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-export type OutputMode = "drawings" | "google_images";
-
 export type PredictionItem = {
   id: PredictionId;
   label: string;
   // PNG data URL. Empty string = not set yet.
   imageDataUrl: string;
-  // If outputMode=google_images, this word/query is used to build redirect URL.
-  // If it starts with http(s):// it will be used as-is as a redirect target.
-  linkQuery?: string;
   // Vector strokes to render prediction at any size (prevents pixelation).
   drawing?: PredictionDrawing;
 };
@@ -49,9 +44,8 @@ export type MotionConfig = {
 };
 
 export type AppConfig = {
-  version: 3;
+  version: 2;
   mode: AppMode;
-  outputMode: OutputMode;
   predictions: PredictionItem[];
   motion: MotionConfig;
 };

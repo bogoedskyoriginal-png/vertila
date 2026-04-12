@@ -9,7 +9,6 @@ import type { AppConfig, PredictionDrawing, PredictionId } from "../types/config
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
-import { buildGoogleImagesUrl } from "../utils/links";
 
 const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
@@ -46,7 +45,6 @@ export function DrawPage() {
 
   const baseSnapshotRef = useRef<string | null>(null);
   const lastPredictionIdRef = useRef<number | null>(null);
-  const redirectedRef = useRef(false);
   const [flash, setFlash] = useState(0);
 
   useEffect(() => {
@@ -57,7 +55,6 @@ export function DrawPage() {
       setRemoteConfig(null);
       baseSnapshotRef.current = null;
       lastPredictionIdRef.current = null;
-      redirectedRef.current = false;
       try {
         const data = await apiGet<UserConfigResponse>(`/api/users/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
@@ -95,17 +92,6 @@ export function DrawPage() {
       if (!canvasApi) return;
       if (!motion.result) return;
       if (motion.state !== "preview" && motion.state !== "locked") return;
-
-      // Experimental: redirect mode (Google Images). Use replace() to avoid leaving the app in history.
-      if (config.outputMode === "google_images" && motion.state === "locked" && !redirectedRef.current) {
-        const p = config.predictions.find((x) => x.id === motion.result?.predictionId);
-        const target = buildGoogleImagesUrl(String(p?.linkQuery || ""));
-        if (target) {
-          redirectedRef.current = true;
-          window.location.replace(target);
-          return;
-        }
-      }
 
       const predId = Number(motion.result.predictionId);
       if (lastPredictionIdRef.current === predId) return;

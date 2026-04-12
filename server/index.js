@@ -72,22 +72,20 @@ function requireMaster(req, res) {
 function normalizeConfig(input) {
   if (!isValidConfig(input)) return DEFAULT_CONFIG;
 
-  // v1 -> v3 migration (keep mode, keep any saved images)
+  // v1 -> v2 migration (keep mode, keep any saved images)
   if (input.version === 1) {
     const byId = new Map();
     for (const p of input.predictions || []) byId.set(Number(p.id), p);
 
     return {
-      version: 3,
+      version: 2,
       mode: input.mode === 8 ? 8 : 4,
-      outputMode: "drawings",
       predictions: DEFAULT_CONFIG.predictions.map((base) => {
         const prev = byId.get(base.id);
         return {
           id: base.id,
           label: base.label,
           imageDataUrl: String(prev?.imageDataUrl || ""),
-          linkQuery: "",
           drawing: { v: 1, aspect: 9 / 16, strokes: [] }
         };
       }),
@@ -100,28 +98,22 @@ function normalizeConfig(input) {
     };
   }
 
-  // v2/v3: lightly normalize fields
+  // v2: lightly normalize fields
   const mode = input.mode === 8 ? 8 : 4;
   const preds = Array.isArray(input.predictions) ? input.predictions : [];
   const byId = new Map();
   for (const p of preds) byId.set(Number(p?.id), p);
 
-  const out = String(input.outputMode || "");
-  const outputMode = out === "google_images" ? "google_images" : "drawings";
-
   return {
-    version: 3,
+    version: 2,
     mode,
-    outputMode,
     predictions: DEFAULT_CONFIG.predictions.map((base) => {
       const prev = byId.get(base.id);
       const prevDrawing = prev?.drawing;
-      const linkQuery = typeof prev?.linkQuery === "string" ? prev.linkQuery : "";
       return {
         id: base.id,
         label: base.label,
         imageDataUrl: String(prev?.imageDataUrl || ""),
-        linkQuery,
         drawing:
           prevDrawing && prevDrawing.v === 1 && Array.isArray(prevDrawing.strokes)
             ? prevDrawing
