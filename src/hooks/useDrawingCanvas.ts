@@ -19,6 +19,12 @@ function getCanvasPoint(canvas: HTMLCanvasElement, clientX: number, clientY: num
   return { x, y };
 }
 
+function getCanvasDpr(canvas: HTMLCanvasElement): number {
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width || 1;
+  return Math.max(1, canvas.width / w);
+}
+
 export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWidth = 28 }: Options) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
@@ -26,16 +32,19 @@ export function useDrawingCanvas({ color, tool = "pen", lineWidth = 5, eraserWid
 
   const applyStrokeStyle = useCallback(
     (ctx: CanvasRenderingContext2D) => {
+      const dpr = getCanvasDpr(ctx.canvas);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       if (tool === "eraser") {
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "rgba(0,0,0,1)";
-        ctx.lineWidth = eraserWidth;
+        // lineWidth is in CSS pixels -> convert to canvas pixels
+        ctx.lineWidth = eraserWidth * dpr;
       } else {
         ctx.globalCompositeOperation = "source-over";
         ctx.strokeStyle = color;
-        ctx.lineWidth = lineWidth;
+        // lineWidth is in CSS pixels -> convert to canvas pixels
+        ctx.lineWidth = lineWidth * dpr;
       }
     },
     [color, eraserWidth, lineWidth, tool]
