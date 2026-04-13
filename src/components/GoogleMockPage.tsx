@@ -88,9 +88,9 @@ export function GoogleMockPage({ priming, charging, theme }: Props) {
           <button type="button" className="linkGoogleIconBtn" aria-label="notifications">
             <BellIcon />
           </button>
-          <div className="linkGoogleAvatar" aria-label="profile">
-            Д
-          </div>
+          <button type="button" className="linkGoogleSignIn" aria-label="sign in">
+            Войти
+          </button>
         </div>
 
         <div className="linkGoogleLogo" aria-hidden="true">
@@ -129,4 +129,3 @@ export function GoogleMockPage({ priming, charging, theme }: Props) {
     </div>
   );
 }
-
