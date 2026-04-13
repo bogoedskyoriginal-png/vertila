@@ -194,8 +194,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     const g = rotateToPortrait(curU.x - baseU.x, curU.y - baseU.y, angle);
     const side = dominantDirection4(g.x, g.y);
 
-    const swingAngle = 30;
-    const resetAngle = 14;
+    // Tilt threshold: lower value triggers earlier (performer wants the redirect/prediction
+    // to appear already around ~20 degrees).
+    const swingAngle = 20;
+    const resetAngle = 10;
 
     const mode = configRef.current.mode;
     const outputMode = configRef.current.outputMode || "drawings";
