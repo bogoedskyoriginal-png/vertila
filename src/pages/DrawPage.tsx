@@ -9,11 +9,14 @@ import type { AppConfig, PredictionDrawing, PredictionId } from "../types/config
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
+import { GoogleMockPage } from "../components/GoogleMockPage";
 
 const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
 function normalizeCode(code: string | undefined) {
-  return String(code || "").trim().toUpperCase();
+  return String(code || "")
+    .trim()
+    .toUpperCase();
 }
 
 function findPredictionImage(config: AppConfig, id: PredictionId) {
@@ -59,6 +62,7 @@ export function DrawPage() {
   const lastPredictionIdRef = useRef<number | null>(null);
   const [flash, setFlash] = useState(0);
   const redirectedRef = useRef(false);
+
   const [priming, setPriming] = useState(false);
   const tapTimesRef = useRef<number[]>([]);
   const primingTimerRef = useRef<number | null>(null);
@@ -182,23 +186,36 @@ export function DrawPage() {
 
   const charging = motion.state === "countdown" || motion.state === "calibrating";
 
+  const handleFourTaps = (opts: { clearCanvas: boolean }) => {
+    const now = Date.now();
+    const list = tapTimesRef.current;
+    list.push(now);
+    while (list.length > 0 && now - list[0] > 900) list.shift();
+    if (list.length < 4) return;
+    list.length = 0;
+
+    if (now - armGuardRef.current < 350) return;
+    armGuardRef.current = now;
+
+    if (primingTimerRef.current) window.clearTimeout(primingTimerRef.current);
+    setPriming(true);
+    primingTimerRef.current = window.setTimeout(() => setPriming(false), 1000);
+
+    redirectedRef.current = false;
+    if (opts.clearCanvas) {
+      baseSnapshotRef.current = null;
+      lastPredictionIdRef.current = null;
+      canvasApi?.clear();
+      setFlash((v) => v + 1);
+    }
+    void motion.arm();
+  };
+
   if (outputMode === "links") {
     return (
       <div className="page appFullHeight" style={{ padding: 0 }}>
-        <div className="linkStartRoot">
-          <button
-            type="button"
-            className={charging ? "linkStartBtn linkStartBtnCharging" : "linkStartBtn"}
-            onClick={() => {
-              redirectedRef.current = false;
-              void motion.arm();
-            }}
-            aria-label="start"
-          >
-            Начать
-            {charging && <span className="linkStartSpinner" aria-hidden="true" />}
-            {!!motion.permissionError && <span className="linkStartErrorDot" aria-hidden="true" />}
-          </button>
+        <div style={{ height: "100%" }} onClickCapture={() => handleFourTaps({ clearCanvas: false })}>
+          <GoogleMockPage priming={priming} charging={charging} />
         </div>
       </div>
     );
@@ -206,35 +223,8 @@ export function DrawPage() {
 
   return (
     <div className="page appFullHeight">
-      <div
-        className="spectatorLayout"
-        onClickCapture={() => {
-          const now = Date.now();
-          const list = tapTimesRef.current;
-          list.push(now);
-          while (list.length > 0 && now - list[0] > 900) list.shift();
-          if (list.length < 4) return;
-          list.length = 0;
-
-          if (now - armGuardRef.current < 350) return;
-          armGuardRef.current = now;
-
-          if (primingTimerRef.current) window.clearTimeout(primingTimerRef.current);
-          setPriming(true);
-          primingTimerRef.current = window.setTimeout(() => setPriming(false), 1000);
-
-          // Same mechanics as old "mop" button: clear + re-arm.
-          baseSnapshotRef.current = null;
-          lastPredictionIdRef.current = null;
-          canvasApi?.clear();
-          redirectedRef.current = false;
-          setFlash((v) => v + 1);
-          void motion.arm();
-        }}
-      >
-        <div
-          className="spectatorCanvasWrap"
-        >
+      <div className="spectatorLayout" onClickCapture={() => handleFourTaps({ clearCanvas: true })}>
+        <div className="spectatorCanvasWrap">
           <DrawingCanvas
             color={color}
             tool={tool}
@@ -285,3 +275,4 @@ export function DrawPage() {
     </div>
   );
 }
+
