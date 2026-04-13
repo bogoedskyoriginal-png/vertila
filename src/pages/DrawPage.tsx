@@ -10,6 +10,7 @@ import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
 import { GoogleMockPage } from "../components/GoogleMockPage";
+import { loadCachedUserConfig, saveCachedUserConfig } from "../utils/userConfigCache";
 
 const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
 
@@ -47,6 +48,7 @@ export function DrawPage() {
   const code = normalizeCode(params.code);
 
   const [remoteConfig, setRemoteConfig] = useState<AppConfig | null>(null);
+  const [cachedConfig, setCachedConfig] = useState<AppConfig | null>(null);
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,7 +56,7 @@ export function DrawPage() {
   const [tool, setTool] = useState<DrawingTool>("pen");
   const [canvasApi, setCanvasApi] = useState<DrawingCanvasApi | null>(null);
 
-  const config = remoteConfig ?? DEFAULT_CONFIG;
+  const config = remoteConfig ?? cachedConfig ?? DEFAULT_CONFIG;
   const motion = useMotionClassifier(config);
   const outputMode = config.outputMode || "drawings";
 
@@ -74,6 +76,7 @@ export function DrawPage() {
       setLoading(true);
       setRemoteError(null);
       setRemoteConfig(null);
+      setCachedConfig(loadCachedUserConfig(code));
       baseSnapshotRef.current = null;
       lastPredictionIdRef.current = null;
       redirectedRef.current = false;
@@ -81,11 +84,12 @@ export function DrawPage() {
         const data = await apiGet<UserConfigResponse>(`/api/users/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
         setRemoteConfig(data.config);
+        saveCachedUserConfig(code, data.config);
       } catch (e) {
         if (cancelled) return;
         setRemoteError(
           e instanceof Error && e.message === "API 404"
-            ? "Страница не найдена."
+            ? "API 404"
             : e instanceof Error
               ? e.message
               : "load_failed"
@@ -159,24 +163,13 @@ export function DrawPage() {
 
   const spectatorUi = useMemo(() => {
     if (remoteError) {
-      return (
-        <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
-          <div className="card" style={{ padding: 14, borderRadius: 16 }}>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>Ошибка</div>
-            <div className="hint">{remoteError}</div>
-          </div>
-        </div>
-      );
+      // No visible error UI on spectator page.
+      return <div className="spectatorPageRoot appFullHeight" />;
     }
 
     if (loading && !remoteConfig) {
-      return (
-        <div className="page" style={{ maxWidth: 720, margin: "0 auto" }}>
-          <div className="card" style={{ padding: 14, borderRadius: 16 }}>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>Загрузка…</div>
-          </div>
-        </div>
-      );
+      // Render immediately (no "window"/card), config loads in background.
+      return null;
     }
 
     return null;
@@ -213,7 +206,7 @@ export function DrawPage() {
 
   if (outputMode === "links") {
     return (
-      <div className="page appFullHeight" style={{ padding: 0 }}>
+      <div className="spectatorPageRoot appFullHeight" style={{ padding: 0 }}>
         <div style={{ height: "100%" }} onClickCapture={() => handleFourTaps({ clearCanvas: false })}>
           <GoogleMockPage priming={priming} charging={charging} />
         </div>
@@ -222,7 +215,7 @@ export function DrawPage() {
   }
 
   return (
-    <div className="page appFullHeight">
+    <div className="spectatorPageRoot appFullHeight">
       <div className="spectatorLayout" onClickCapture={() => handleFourTaps({ clearCanvas: true })}>
         <div className="spectatorCanvasWrap">
           <DrawingCanvas
@@ -275,4 +268,3 @@ export function DrawPage() {
     </div>
   );
 }
-
