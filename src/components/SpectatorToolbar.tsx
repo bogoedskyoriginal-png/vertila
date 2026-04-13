@@ -8,7 +8,6 @@ type Props = {
   onSelectColor: (color: string) => void;
   onSelectTool: (tool: DrawingTool) => void;
   charging: boolean;
-  hasError: boolean;
   priming: boolean;
 };
 
@@ -38,7 +37,6 @@ export function SpectatorToolbar({
   onSelectColor,
   onSelectTool,
   charging,
-  hasError,
   priming
 }: Props) {
   return (
@@ -52,7 +50,7 @@ export function SpectatorToolbar({
           onSelectTool={onSelectTool}
         />
 
-        <PrimingIndicator active={priming} />
+        <PrimingIndicator active={priming || charging} />
       </div>
     </div>
   );

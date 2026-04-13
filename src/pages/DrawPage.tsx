@@ -62,6 +62,7 @@ export function DrawPage() {
   const [priming, setPriming] = useState(false);
   const tapTimesRef = useRef<number[]>([]);
   const primingTimerRef = useRef<number | null>(null);
+  const armGuardRef = useRef<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,28 +206,34 @@ export function DrawPage() {
 
   return (
     <div className="page appFullHeight">
-      <div className="spectatorLayout">
+      <div
+        className="spectatorLayout"
+        onClickCapture={() => {
+          const now = Date.now();
+          const list = tapTimesRef.current;
+          list.push(now);
+          while (list.length > 0 && now - list[0] > 900) list.shift();
+          if (list.length < 4) return;
+          list.length = 0;
+
+          if (now - armGuardRef.current < 350) return;
+          armGuardRef.current = now;
+
+          if (primingTimerRef.current) window.clearTimeout(primingTimerRef.current);
+          setPriming(true);
+          primingTimerRef.current = window.setTimeout(() => setPriming(false), 1000);
+
+          // Same mechanics as old "mop" button: clear + re-arm.
+          baseSnapshotRef.current = null;
+          lastPredictionIdRef.current = null;
+          canvasApi?.clear();
+          redirectedRef.current = false;
+          setFlash((v) => v + 1);
+          void motion.arm();
+        }}
+      >
         <div
           className="spectatorCanvasWrap"
-          onPointerDown={() => {
-            const now = Date.now();
-            const list = tapTimesRef.current;
-            list.push(now);
-            while (list.length > 0 && now - list[0] > 900) list.shift();
-            if (list.length < 4) return;
-            list.length = 0;
-
-            if (primingTimerRef.current) window.clearTimeout(primingTimerRef.current);
-            setPriming(true);
-            primingTimerRef.current = window.setTimeout(() => setPriming(false), 1000);
-
-            baseSnapshotRef.current = null;
-            lastPredictionIdRef.current = null;
-            canvasApi?.clear();
-            redirectedRef.current = false;
-            setFlash((v) => v + 1);
-            void motion.arm();
-          }}
         >
           <DrawingCanvas
             color={color}
@@ -244,7 +251,6 @@ export function DrawPage() {
           onSelectColor={setColor}
           onSelectTool={setTool}
           charging={charging}
-          hasError={!!motion.permissionError}
           priming={priming}
         />
 
