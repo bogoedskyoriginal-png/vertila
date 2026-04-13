@@ -45,6 +45,8 @@ export function useDrawingCanvas({
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
   const pointsPxRef = useRef<Point[]>([]);
+  const rafRef = useRef<number | null>(null);
+  const lastDrawIndexRef = useRef(0);
   const currentStrokeRef = useRef<DrawingStroke | null>(null);
 
   const applyStrokeStyle = useCallback(
@@ -256,6 +258,7 @@ export function useDrawingCanvas({
       const p = getCanvasPoint(canvas, clientX, clientY);
       lastPointRef.current = p;
       pointsPxRef.current = [p];
+      lastDrawIndexRef.current = 0;
 
       const widthCss = tool === "eraser" ? eraserWidth : lineWidth;
       currentStrokeRef.current = {
@@ -268,40 +271,68 @@ export function useDrawingCanvas({
     [applyStrokeStyle, color, eraserWidth, lineWidth, tool]
   );
 
+  const flushDraw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (!isDrawingRef.current) return;
+
+    const pts = pointsPxRef.current;
+    const startIdx = lastDrawIndexRef.current;
+    const endIdx = pts.length - 1;
+    if (endIdx <= startIdx) return;
+
+    applyStrokeStyle(ctx);
+
+    // Draw incrementally from the last drawn point.
+    // Quadratic smoothing reduces jaggedness (especially visible on vertical strokes).
+    for (let i = Math.max(1, startIdx + 1); i <= endIdx; i++) {
+      const p0 = pts[i - 1];
+      const p1 = pts[i];
+      if (!p0 || !p1) continue;
+
+      if (i === 1) {
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+        continue;
+      }
+
+      const pPrev = pts[i - 2];
+      if (!pPrev) continue;
+      const mid1 = { x: (pPrev.x + p0.x) / 2, y: (pPrev.y + p0.y) / 2 };
+      const mid2 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+      ctx.beginPath();
+      ctx.moveTo(mid1.x, mid1.y);
+      ctx.quadraticCurveTo(p0.x, p0.y, mid2.x, mid2.y);
+      ctx.stroke();
+    }
+
+    lastDrawIndexRef.current = endIdx;
+  }, [applyStrokeStyle]);
+
+  const scheduleDraw = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = null;
+      flushDraw();
+    });
+  }, [flushDraw]);
+
   const move = useCallback(
     (clientX: number, clientY: number) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       if (!isDrawingRef.current) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
       const next = getCanvasPoint(canvas, clientX, clientY);
 
-      applyStrokeStyle(ctx);
       const pts = pointsPxRef.current;
       pts.push(next);
       lastPointRef.current = next;
 
-      // Simple smoothing: draw quadratic curves between midpoints.
-      // This reduces jagged/pixelated vertical lines on lower event rates.
-      if (pts.length === 2) {
-        const a = pts[0];
-        const b = pts[1];
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      } else if (pts.length >= 3) {
-        const p1 = pts[pts.length - 3];
-        const p2 = pts[pts.length - 2];
-        const p3 = pts[pts.length - 1];
-        const mid1 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-        const mid2 = { x: (p2.x + p3.x) / 2, y: (p2.y + p3.y) / 2 };
-        ctx.beginPath();
-        ctx.moveTo(mid1.x, mid1.y);
-        ctx.quadraticCurveTo(p2.x, p2.y, mid2.x, mid2.y);
-        ctx.stroke();
-      }
+      scheduleDraw();
 
       const st = currentStrokeRef.current;
       if (st) {
@@ -316,13 +347,20 @@ export function useDrawingCanvas({
   );
 
   const end = useCallback(() => {
+    if (rafRef.current) {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    // Ensure any queued points are rendered before finishing the stroke.
+    flushDraw();
     isDrawingRef.current = false;
     lastPointRef.current = null;
     pointsPxRef.current = [];
+    lastDrawIndexRef.current = 0;
     const st = currentStrokeRef.current;
     currentStrokeRef.current = null;
     if (st && st.points.length >= 2) onStrokeComplete?.(st);
-  }, [onStrokeComplete]);
+  }, [flushDraw, onStrokeComplete]);
 
   const bindPointerHandlers = useMemo(() => {
     return {

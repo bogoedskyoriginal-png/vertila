@@ -92,6 +92,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
   const baselineUnitRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const samplesRef = useRef<MotionSample[]>([]);
   const lastEventAtRef = useRef<number>(0);
+  const lastProcessedAtRef = useRef<number>(0);
 
   const listenerAttachedRef = useRef(false);
   const lockedRef = useRef(false);
@@ -129,13 +130,18 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     // heartbeat (even during countdown)
     lastEventAtRef.current = Date.now();
 
+    // Throttle processing for stability/perf across devices (some iPhones can fire 100+ Hz).
+    const pNow = nowMs();
+    if (pNow - lastProcessedAtRef.current < 16) return; // ~60fps max
+    lastProcessedAtRef.current = pNow;
+
     const st = stateRef.current;
     if (st !== "calibrating" && st !== "armed" && st !== "preview") return;
 
     const x = Number(a.x || 0);
     const y = Number(a.y || 0);
     const z = Number(a.z || 0);
-    const t = nowMs();
+    const t = pNow;
 
     if (st === "calibrating") {
       samplesRef.current.push({ t, x, y, z });
