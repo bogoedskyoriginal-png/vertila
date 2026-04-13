@@ -9,6 +9,7 @@ type Props = {
   onSelectTool: (tool: DrawingTool) => void;
   charging: boolean;
   priming: boolean;
+  onClear: () => void;
 };
 
 function PrimingIndicator({ active }: { active: boolean }) {
@@ -30,6 +31,43 @@ function PrimingIndicator({ active }: { active: boolean }) {
   );
 }
 
+function ClearIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        d="M7 6h10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9 6l.7-2h4.6L15 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 6l1 15h6l1-15"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.5 10v7M13.5 10v7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function SpectatorToolbar({
   colors,
   selectedColor,
@@ -37,7 +75,8 @@ export function SpectatorToolbar({
   onSelectColor,
   onSelectTool,
   charging,
-  priming
+  priming,
+  onClear
 }: Props) {
   return (
     <div className="spectatorBarDock" role="toolbar" aria-label="drawing tools">
@@ -50,7 +89,12 @@ export function SpectatorToolbar({
           onSelectTool={onSelectTool}
         />
 
-        <PrimingIndicator active={priming || charging} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button type="button" className="toolBtn" aria-label="clear canvas" onClick={onClear}>
+            <ClearIcon />
+          </button>
+          <PrimingIndicator active={priming || charging} />
+        </div>
       </div>
     </div>
   );

@@ -252,6 +252,11 @@ export function DrawPage() {
           onSelectTool={setTool}
           charging={charging}
           priming={priming}
+          onClear={() => {
+            baseSnapshotRef.current = null;
+            lastPredictionIdRef.current = null;
+            canvasApi?.clear();
+          }}
         />
 
         {flash > 0 && (
