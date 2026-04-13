@@ -563,7 +563,7 @@ textarea {
   border: none;
   background: transparent;
   color: var(--g-muted);
-  padding: 8px;
+  padding: 6px;
   border-radius: 999px;
 }
 
@@ -571,13 +571,13 @@ textarea {
   appearance: none;
   -webkit-appearance: none;
   border: none;
-  height: 36px;
-  padding: 0 16px;
+  height: 34px;
+  padding: 0 14px;
   border-radius: 999px;
   background: #1a73e8;
   color: #fff;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   letter-spacing: 0.1px;
   cursor: default;
 }
