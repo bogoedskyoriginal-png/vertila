@@ -206,7 +206,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
             const finalSide = flipSideRef.current;
             const predictionId = predictionIdFor(finalSide, speed, 8);
             setResult({ side: finalSide, speed, durationMs: dt, predictionId });
-            setState("preview");
+            // Freeze early to avoid any visible "switch" later during the same flip.
+            lockedRef.current = true;
+            setState("locked");
+            return;
           }
         }
 
@@ -272,8 +275,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       inSwingRef.current = false;
     }
 
-    // If performer fully flips after 1st swing — lock the preview.
-    if (!lockedRef.current && st === "preview" && swingCountRef.current === 1 && flipped) {
+    // If performer fully flips — lock whatever was previewed (prevents post-flip changes).
+    if (!lockedRef.current && st === "preview" && flipped) {
       lockedRef.current = true;
       setState("locked");
     }
@@ -319,7 +322,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     }, settleMs);
 
     window.setTimeout(() => {
-      const base = meanSample(samplesRef.current.filter((s) => s.t >= startAt + settleMs));
+      const recent = samplesRef.current.filter((s) => s.t >= startAt + settleMs);
+      // Some browsers throttle motion events when device is perfectly still.
+      // If we didn't receive enough post-settle samples, fall back to all samples.
+      const base = meanSample(recent.length >= 6 ? recent : samplesRef.current);
       baselineRef.current = base;
       baselineUnitRef.current = normalize3(base.x, base.y, base.z);
       samplesRef.current = [];
