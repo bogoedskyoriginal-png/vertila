@@ -403,15 +403,45 @@ export function useDrawingCanvas({
     const parent = canvas.parentElement;
     if (!parent) return;
 
+    const applySize = (width: number, height: number) => {
+      // iOS/Safari can briefly report 0x0 during viewport transitions.
+      // If we apply that, canvas becomes effectively non-drawable (height ~ 1px).
+      if (width < 40 || height < 40) return;
+      setSizePreservingContent(width, height);
+    };
+
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
       const box = entry.contentRect;
-      setSizePreservingContent(Math.floor(box.width), Math.floor(box.height));
+      applySize(Math.floor(box.width), Math.floor(box.height));
     });
 
     ro.observe(parent);
-    return () => ro.disconnect();
+    const measure = () => {
+      const rect = parent.getBoundingClientRect();
+      applySize(Math.floor(rect.width), Math.floor(rect.height));
+    };
+
+    // Fallback: force one measurement on next frame (helps if RO fires before layout settles).
+    const raf = window.requestAnimationFrame(measure);
+
+    // iOS viewport changes (address bar collapse/expand, orientation changes) can desync layout
+    // without reliably triggering ResizeObserver. Re-measure on those events.
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", measure, { passive: true } as any);
+    vv?.addEventListener("scroll", measure, { passive: true } as any);
+    window.addEventListener("orientationchange", measure, { passive: true } as any);
+    window.addEventListener("resize", measure, { passive: true } as any);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      vv?.removeEventListener("resize", measure as any);
+      vv?.removeEventListener("scroll", measure as any);
+      window.removeEventListener("orientationchange", measure as any);
+      window.removeEventListener("resize", measure as any);
+      ro.disconnect();
+    };
   }, [setSizePreservingContent]);
 
   return {
@@ -423,4 +453,3 @@ export function useDrawingCanvas({
     bindPointerHandlers
   };
 }
-
