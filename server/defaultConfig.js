@@ -1,7 +1,8 @@
-export const DEFAULT_CONFIG = {
+﻿export const DEFAULT_CONFIG = {
   version: 2,
   mode: 4,
   outputMode: "drawings",
+  linkUiTheme: "dark",
   // 1..4: slow top/right/bottom/left
   // 5..8: fast top/right/bottom/left
   predictions: [1, 2, 3, 4, 5, 6, 7, 8].map((id) => ({

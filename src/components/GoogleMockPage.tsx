@@ -1,6 +1,7 @@
 type Props = {
   priming: boolean;
   charging: boolean;
+  theme: "dark" | "light";
 };
 
 function BellIcon() {
@@ -75,9 +76,9 @@ function Spinner() {
   return <span className="linkGoogleSpinner" aria-hidden="true" />;
 }
 
-export function GoogleMockPage({ priming, charging }: Props) {
+export function GoogleMockPage({ priming, charging, theme }: Props) {
   return (
-    <div className="linkGoogleRoot" aria-label="search">
+    <div className={theme === "light" ? "linkGoogleRoot linkGoogleRootLight" : "linkGoogleRoot"} aria-label="search">
       <div className="linkGoogleTop">
         <div className="linkGoogleTopRight">
           <button type="button" className="linkGoogleIconBtn" aria-label="notifications">
@@ -88,7 +89,12 @@ export function GoogleMockPage({ priming, charging }: Props) {
           </div>
         </div>
         <div className="linkGoogleLogo" aria-hidden="true">
-          Google
+          <span className="gL gBlue">G</span>
+          <span className="gL gRed">o</span>
+          <span className="gL gYellow">o</span>
+          <span className="gL gBlue">g</span>
+          <span className="gL gGreen">l</span>
+          <span className="gL gRed">e</span>
         </div>
       </div>
 
@@ -123,4 +129,3 @@ export function GoogleMockPage({ priming, charging }: Props) {
     </div>
   );
 }
-

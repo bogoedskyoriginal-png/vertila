@@ -205,10 +205,11 @@ export function DrawPage() {
   };
 
   if (outputMode === "links") {
+    const theme = config.linkUiTheme === "light" ? "light" : "dark";
     return (
       <div className="spectatorPageRoot appFullHeight" style={{ padding: 0 }}>
         <div style={{ height: "100%" }} onClickCapture={() => handleFourTaps({ clearCanvas: false })}>
-          <GoogleMockPage priming={priming} charging={charging} />
+          <GoogleMockPage priming={priming} charging={charging} theme={theme} />
         </div>
       </div>
     );

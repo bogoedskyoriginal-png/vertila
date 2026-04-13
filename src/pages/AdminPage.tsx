@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { AppConfig, AppMode, OutputMode, PredictionDrawing, PredictionId } from "../types/config";
+import type { AppConfig, AppMode, LinkUiTheme, OutputMode, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
@@ -70,6 +70,7 @@ export function AdminPage() {
 
   const config = remote ?? DEFAULT_CONFIG;
   const outputMode: OutputMode = config.outputMode || "drawings";
+  const linkUiTheme: LinkUiTheme = config.linkUiTheme === "light" ? "light" : "dark";
   const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
   const predictionMap = useMemo(() => new Map(config.predictions.map((p) => [p.id, p])), [config.predictions]);
 
@@ -205,7 +206,12 @@ export function AdminPage() {
                   onClick={() =>
                     setRemote((prev) => {
                       const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, outputMode: "links", motion: { ...base.motion, mode8Strategy: "tilts" } };
+                      return {
+                        ...base,
+                        outputMode: "links",
+                        linkUiTheme: base.linkUiTheme || "dark",
+                        motion: { ...base.motion, mode8Strategy: "tilts" }
+                      };
                     })
                   }
                 >
@@ -213,6 +219,32 @@ export function AdminPage() {
                 </button>
               </div>
             </div>
+
+            {outputMode === "links" && (
+              <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+                <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
+                  Дизайн страницы
+                </div>
+                <div className="segmented segmentedOneCol">
+                  <button
+                    type="button"
+                    className={linkUiTheme === "dark" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), linkUiTheme: "dark" }))}
+                  >
+                    Тёмный
+                  </button>
+                  <button
+                    type="button"
+                    className={linkUiTheme === "light" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), linkUiTheme: "light" }))}
+                  >
+                    Светлый
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="card" style={{ padding: 12, borderRadius: 16 }}>
               <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>

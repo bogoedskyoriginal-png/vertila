@@ -7,6 +7,8 @@ export type PredictionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type OutputMode = "drawings" | "links";
 
+export type LinkUiTheme = "dark" | "light";
+
 export type PredictionItem = {
   id: PredictionId;
   label: string;
@@ -55,6 +57,7 @@ export type AppConfig = {
   version: 2;
   mode: AppMode;
   outputMode: OutputMode;
+  linkUiTheme?: LinkUiTheme;
   predictions: PredictionItem[];
   motion: MotionConfig;
 };
