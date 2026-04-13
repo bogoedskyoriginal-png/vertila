@@ -99,81 +99,86 @@ export function useDrawingCanvas({
 
   const drawStrokes = useCallback(
     async (drawing: PredictionDrawing, opts?: { clear?: boolean; fit?: "contain" | "cover" }) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    if (opts?.clear !== false) {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.globalCompositeOperation = "source-over";
-      ctx.imageSmoothingEnabled = true;
-      // @ts-expect-error - older lib.dom.d.ts may not include this
-      ctx.imageSmoothingQuality = "high";
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-
-    const dpr = getCanvasDpr(canvas);
-    const strokes = Array.isArray(drawing?.strokes) ? drawing.strokes : [];
-    const aspect =
-      typeof drawing?.aspect === "number" && Number.isFinite(drawing.aspect) && drawing.aspect > 0.1
-        ? drawing.aspect
-        : canvas.width / Math.max(1, canvas.height);
-
-    const canvasAspect = canvas.width / Math.max(1, canvas.height);
-    let targetW = canvas.width;
-    let targetH = canvas.height;
-    let offX = 0;
-    let offY = 0;
-    const fit = opts?.fit ?? "contain";
-    if (fit === "cover") {
-      if (canvasAspect > aspect) {
-        targetW = canvas.width;
-        targetH = targetW / aspect;
-        offY = (canvas.height - targetH) / 2;
-      } else {
-        targetH = canvas.height;
-        targetW = targetH * aspect;
-        offX = (canvas.width - targetW) / 2;
-      }
-    } else {
-      if (canvasAspect > aspect) {
-        targetH = canvas.height;
-        targetW = targetH * aspect;
-        offX = (canvas.width - targetW) / 2;
-      } else {
-        targetW = canvas.width;
-        targetH = targetW / aspect;
-        offY = (canvas.height - targetH) / 2;
-      }
-    }
-
-    for (const s of strokes) {
-      const pts = Array.isArray(s?.points) ? s.points : [];
-      if (pts.length < 2) continue;
-
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.imageSmoothingEnabled = true;
-      // @ts-expect-error - older lib.dom.d.ts may not include this
-      ctx.imageSmoothingQuality = "high";
-      if (s.tool === "eraser") {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
-      } else {
+      if (opts?.clear !== false) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = String(s.color || "#111827");
-        ctx.lineWidth = Math.max(1, Number(s.width || 0)) * dpr;
+        ctx.imageSmoothingEnabled = true;
+        // @ts-expect-error - older lib.dom.d.ts may not include this
+        ctx.imageSmoothingQuality = "high";
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
 
-      ctx.beginPath();
-      ctx.moveTo(offX + pts[0].x * targetW, offY + pts[0].y * targetH);
-      for (let i = 1; i < pts.length; i++) {
-        ctx.lineTo(offX + pts[i].x * targetW, offY + pts[i].y * targetH);
+      const dpr = getCanvasDpr(canvas);
+      const strokes = Array.isArray(drawing?.strokes) ? drawing.strokes : [];
+      const aspect =
+        typeof drawing?.aspect === "number" && Number.isFinite(drawing.aspect) && drawing.aspect > 0.1
+          ? drawing.aspect
+          : canvas.width / Math.max(1, canvas.height);
+
+      const canvasAspect = canvas.width / Math.max(1, canvas.height);
+      let targetW = canvas.width;
+      let targetH = canvas.height;
+      let offX = 0;
+      let offY = 0;
+      const fit = opts?.fit ?? "contain";
+      if (fit === "cover") {
+        if (canvasAspect > aspect) {
+          targetW = canvas.width;
+          targetH = targetW / aspect;
+          offY = (canvas.height - targetH) / 2;
+        } else {
+          targetH = canvas.height;
+          targetW = targetH * aspect;
+          offX = (canvas.width - targetW) / 2;
+        }
+      } else {
+        if (canvasAspect > aspect) {
+          targetH = canvas.height;
+          targetW = targetH * aspect;
+          offX = (canvas.width - targetW) / 2;
+        } else {
+          targetW = canvas.width;
+          targetH = targetW / aspect;
+          offY = (canvas.height - targetH) / 2;
+        }
       }
-      ctx.stroke();
-    }
+
+      const drawStroke = (stroke: DrawingStroke) => {
+        const pts = Array.isArray(stroke.points) ? stroke.points : [];
+        if (pts.length < 2) return;
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.imageSmoothingEnabled = true;
+        // @ts-expect-error - older lib.dom.d.ts may not include this
+        ctx.imageSmoothingQuality = "high";
+        if (stroke.tool === "eraser") {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.strokeStyle = "rgba(0,0,0,1)";
+        } else {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.strokeStyle = stroke.color || "#111827";
+        }
+
+        ctx.lineWidth = Math.max(1, (Number(stroke.width) || 1) * dpr);
+        ctx.beginPath();
+
+        const p0 = pts[0]!;
+        ctx.moveTo(offX + p0.x * targetW, offY + p0.y * targetH);
+        for (let i = 1; i < pts.length; i++) {
+          const p = pts[i]!;
+          ctx.lineTo(offX + p.x * targetW, offY + p.y * targetH);
+        }
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      for (const s of strokes) drawStroke(s);
     },
     []
   );
@@ -185,14 +190,16 @@ export function useDrawingCanvas({
     if (!ctx) return;
 
     const img = new Image();
-    img.decoding = "async";
-    await new Promise<void>((resolve, reject) => {
+    const loaded = new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error("image load failed"));
-      img.src = dataUrl;
-    }).catch(() => undefined);
-
-    if (!img.width || !img.height) return;
+      img.onerror = () => reject();
+    });
+    img.src = dataUrl;
+    try {
+      await loaded;
+    } catch {
+      return;
+    }
 
     if (opts?.clear !== false) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -396,45 +403,15 @@ export function useDrawingCanvas({
     const parent = canvas.parentElement;
     if (!parent) return;
 
-    const applySize = (width: number, height: number) => {
-      // iOS/Safari can briefly report 0x0 during viewport transitions.
-      // If we apply that, canvas becomes effectively non-drawable (height ~ 1px).
-      if (width < 40 || height < 40) return;
-      setSizePreservingContent(width, height);
-    };
-
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
       const box = entry.contentRect;
-      applySize(Math.floor(box.width), Math.floor(box.height));
+      setSizePreservingContent(Math.floor(box.width), Math.floor(box.height));
     });
 
     ro.observe(parent);
-    const measure = () => {
-      const rect = parent.getBoundingClientRect();
-      applySize(Math.floor(rect.width), Math.floor(rect.height));
-    };
-
-    // Fallback: force one measurement on next frame (helps if RO fires before layout settles).
-    const raf = window.requestAnimationFrame(measure);
-
-    // iOS viewport changes (address bar collapse/expand, orientation changes) can desync layout
-    // without reliably triggering ResizeObserver. Re-measure on those events.
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", measure, { passive: true } as any);
-    vv?.addEventListener("scroll", measure, { passive: true } as any);
-    window.addEventListener("orientationchange", measure, { passive: true } as any);
-    window.addEventListener("resize", measure, { passive: true } as any);
-
-    return () => {
-      window.cancelAnimationFrame(raf);
-      vv?.removeEventListener("resize", measure as any);
-      vv?.removeEventListener("scroll", measure as any);
-      window.removeEventListener("orientationchange", measure as any);
-      window.removeEventListener("resize", measure as any);
-      ro.disconnect();
-    };
+    return () => ro.disconnect();
   }, [setSizePreservingContent]);
 
   return {
@@ -446,3 +423,4 @@ export function useDrawingCanvas({
     bindPointerHandlers
   };
 }
+
