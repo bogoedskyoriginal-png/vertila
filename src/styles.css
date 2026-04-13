@@ -290,11 +290,11 @@ textarea {
   max-width: 720px;
   margin: 0 auto;
   height: 100%;
-  display: grid;
-  grid-template-rows: 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  /* Canvas should use maximum available height; toolbar occupies its own row. */
-  padding-bottom: 0;
+  /* Leave room for the bottom dock (toolbar + safe-area). */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 .spectatorBar {
@@ -311,9 +311,12 @@ textarea {
 }
 
 .spectatorBarDock {
-  position: relative;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   /* Keep the toolbar as low as possible while respecting the iOS safe-area. */
-  padding: 6px 0 calc(6px + env(safe-area-inset-bottom)) 0;
+  padding: 6px 12px env(safe-area-inset-bottom) 12px;
   box-sizing: border-box;
   z-index: 20;
 }
