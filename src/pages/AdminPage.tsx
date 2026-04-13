@@ -279,7 +279,7 @@ export function AdminPage() {
                 <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
                   Чувствительность скорости
                 </div>
-                <div className="segmented" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+                <div className="segmented segmentedOneCol">
                   <button
                     type="button"
                     className={speedSensitivity === "low" ? "segBtn segBtnActive" : "segBtn"}

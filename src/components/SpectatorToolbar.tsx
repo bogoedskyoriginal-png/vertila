@@ -7,39 +7,29 @@ type Props = {
   tool: DrawingTool;
   onSelectColor: (color: string) => void;
   onSelectTool: (tool: DrawingTool) => void;
-  onMop: () => void;
   charging: boolean;
   hasError: boolean;
+  priming: boolean;
 };
 
-function MopIcon() {
+function TinyIndicator({ active, error }: { active: boolean; error: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <path
-        d="M14 3l7 7-2 2-7-7 2-2Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M3 21h10l7-7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 18l3 3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div
+      aria-hidden="true"
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        border: "1px solid rgba(17, 24, 39, 0.12)",
+        background: "#fff",
+        display: "grid",
+        placeItems: "center",
+        position: "relative"
+      }}
+    >
+      {active ? <span className="spinnerRing" aria-hidden="true" style={{ inset: -4 }} /> : <span style={{ width: 8, height: 8, borderRadius: 999, background: "rgba(17,24,39,0.18)" }} />}
+      {error && <span className="errorDot" aria-hidden="true" />}
+    </div>
   );
 }
 
@@ -49,9 +39,9 @@ export function SpectatorToolbar({
   tool,
   onSelectColor,
   onSelectTool,
-  onMop,
   charging,
-  hasError
+  hasError,
+  priming
 }: Props) {
   return (
     <div className="spectatorBarDock" role="toolbar" aria-label="drawing tools">
@@ -64,16 +54,7 @@ export function SpectatorToolbar({
           onSelectTool={onSelectTool}
         />
 
-        <button
-          type="button"
-          className={charging ? "toolBtn toolBtnPrimary toolBtnLoading" : "toolBtn toolBtnPrimary"}
-          aria-label="clean and arm"
-          onClick={onMop}
-        >
-          <MopIcon />
-          {charging && <span className="spinnerRing" aria-hidden="true" />}
-          {hasError && <span className="errorDot" aria-hidden="true" />}
-        </button>
+        <TinyIndicator active={priming} error={hasError} />
       </div>
     </div>
   );

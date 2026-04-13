@@ -59,6 +59,9 @@ export function DrawPage() {
   const lastPredictionIdRef = useRef<number | null>(null);
   const [flash, setFlash] = useState(0);
   const redirectedRef = useRef(false);
+  const [priming, setPriming] = useState(false);
+  const tapTimesRef = useRef<number[]>([]);
+  const primingTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +101,13 @@ export function DrawPage() {
     return () => {
       document.documentElement.classList.remove("noScroll");
       document.body.classList.remove("noScroll");
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (primingTimerRef.current) window.clearTimeout(primingTimerRef.current);
+      primingTimerRef.current = null;
     };
   }, []);
 
@@ -196,7 +206,28 @@ export function DrawPage() {
   return (
     <div className="page appFullHeight">
       <div className="spectatorLayout">
-        <div className="spectatorCanvasWrap">
+        <div
+          className="spectatorCanvasWrap"
+          onPointerDown={() => {
+            const now = Date.now();
+            const list = tapTimesRef.current;
+            list.push(now);
+            while (list.length > 0 && now - list[0] > 900) list.shift();
+            if (list.length < 4) return;
+            list.length = 0;
+
+            if (primingTimerRef.current) window.clearTimeout(primingTimerRef.current);
+            setPriming(true);
+            primingTimerRef.current = window.setTimeout(() => setPriming(false), 1000);
+
+            baseSnapshotRef.current = null;
+            lastPredictionIdRef.current = null;
+            canvasApi?.clear();
+            redirectedRef.current = false;
+            setFlash((v) => v + 1);
+            void motion.arm();
+          }}
+        >
           <DrawingCanvas
             color={color}
             tool={tool}
@@ -214,13 +245,7 @@ export function DrawPage() {
           onSelectTool={setTool}
           charging={charging}
           hasError={!!motion.permissionError}
-          onMop={() => {
-            baseSnapshotRef.current = null;
-            lastPredictionIdRef.current = null;
-            canvasApi?.clear();
-            setFlash((v) => v + 1);
-            void motion.arm();
-          }}
+          priming={priming}
         />
 
         {flash > 0 && (
