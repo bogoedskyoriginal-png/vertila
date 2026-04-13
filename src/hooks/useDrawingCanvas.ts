@@ -411,13 +411,28 @@ export function useDrawingCanvas({
     });
 
     ro.observe(parent);
-    // Fallback: force one measurement on next frame (helps if RO fires before layout settles).
-    const raf = window.requestAnimationFrame(() => {
+    const measure = () => {
       const rect = parent.getBoundingClientRect();
       applySize(Math.floor(rect.width), Math.floor(rect.height));
-    });
+    };
+
+    // Fallback: force one measurement on next frame (helps if RO fires before layout settles).
+    const raf = window.requestAnimationFrame(measure);
+
+    // iOS viewport changes (address bar collapse/expand, orientation changes) can desync layout
+    // without reliably triggering ResizeObserver. Re-measure on those events.
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", measure, { passive: true } as any);
+    vv?.addEventListener("scroll", measure, { passive: true } as any);
+    window.addEventListener("orientationchange", measure, { passive: true } as any);
+    window.addEventListener("resize", measure, { passive: true } as any);
+
     return () => {
       window.cancelAnimationFrame(raf);
+      vv?.removeEventListener("resize", measure as any);
+      vv?.removeEventListener("scroll", measure as any);
+      window.removeEventListener("orientationchange", measure as any);
+      window.removeEventListener("resize", measure as any);
       ro.disconnect();
     };
   }, [setSizePreservingContent]);
