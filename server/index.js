@@ -109,6 +109,7 @@ function normalizeConfig(input) {
       version: 2,
       mode: input.mode === 8 ? 8 : 4,
       outputMode: "drawings",
+      linkUiTheme: DEFAULT_CONFIG.linkUiTheme || "system",
       predictions: DEFAULT_CONFIG.predictions.map((base) => {
         const prev = byId.get(base.id);
         return {
@@ -139,6 +140,12 @@ function normalizeConfig(input) {
   const out = String(input.outputMode || "");
   const outputMode = out === "links" ? "links" : DEFAULT_CONFIG.outputMode;
 
+  const rawTheme = String(input.linkUiTheme || "");
+  const linkUiTheme =
+    rawTheme === "light" || rawTheme === "dark" || rawTheme === "system"
+      ? rawTheme
+      : (DEFAULT_CONFIG.linkUiTheme || "system");
+
   const sens = String(input.motion?.speedSensitivity || "");
   const speedSensitivity = sens === "low" || sens === "high" ? sens : "medium";
 
@@ -146,6 +153,7 @@ function normalizeConfig(input) {
     version: 2,
     mode,
     outputMode,
+    linkUiTheme,
     predictions: DEFAULT_CONFIG.predictions.map((base) => {
       const prev = byId.get(base.id);
       const prevDrawing = prev?.drawing;
