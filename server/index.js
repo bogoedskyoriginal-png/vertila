@@ -124,8 +124,8 @@ function normalizeConfig(input) {
         calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
         motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
         fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs),
-        mode8Strategy:
-          String(input.motion?.mode8Strategy || "") === "speed" ? "speed" : DEFAULT_CONFIG.motion.mode8Strategy
+        mode8Strategy: String(input.motion?.mode8Strategy || "") === "speed" ? "speed" : DEFAULT_CONFIG.motion.mode8Strategy,
+        speedSensitivity: "medium"
       }
     };
   }
@@ -138,6 +138,9 @@ function normalizeConfig(input) {
 
   const out = String(input.outputMode || "");
   const outputMode = out === "links" ? "links" : DEFAULT_CONFIG.outputMode;
+
+  const sens = String(input.motion?.speedSensitivity || "");
+  const speedSensitivity = sens === "low" || sens === "high" ? sens : "medium";
 
   return {
     version: 2,
@@ -163,7 +166,8 @@ function normalizeConfig(input) {
       calibrationMs: Number(input.motion?.calibrationMs || DEFAULT_CONFIG.motion.calibrationMs),
       motionThreshold: Number(input.motion?.motionThreshold || DEFAULT_CONFIG.motion.motionThreshold),
       fastFlipMs: Number(input.motion?.fastFlipMs || DEFAULT_CONFIG.motion.fastFlipMs),
-      mode8Strategy: String(input.motion?.mode8Strategy || "") === "speed" ? "speed" : DEFAULT_CONFIG.motion.mode8Strategy
+      mode8Strategy: String(input.motion?.mode8Strategy || "") === "speed" ? "speed" : DEFAULT_CONFIG.motion.mode8Strategy,
+      speedSensitivity
     }
   };
 }

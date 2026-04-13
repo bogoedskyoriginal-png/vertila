@@ -34,6 +34,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     calibrationMs: 350,
     motionThreshold: 3.5,
     fastFlipMs: 450,
-    mode8Strategy: "tilts"
+    mode8Strategy: "tilts",
+    speedSensitivity: "medium"
   }
 };

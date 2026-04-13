@@ -73,6 +73,34 @@ function dot3(a: { x: number; y: number; z: number }, b: { x: number; y: number;
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+function getScreenAngleDeg(): 0 | 90 | 180 | 270 {
+  try {
+    const s = window.screen as any;
+    const raw =
+      typeof s?.orientation?.angle === "number"
+        ? s.orientation.angle
+        : typeof (window as any).orientation === "number"
+          ? (window as any).orientation
+          : 0;
+    let a = Number(raw);
+    if (!Number.isFinite(a)) a = 0;
+    a = ((a % 360) + 360) % 360;
+    if (a === 90 || a === 180 || a === 270) return a;
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
+function rotateToPortrait(x: number, y: number, angle: 0 | 90 | 180 | 270) {
+  // Convert device axes to a portrait-like reference so “left/right/top/bottom”
+  // matches the UI regardless of screen orientation.
+  if (angle === 90) return { x: y, y: -x };
+  if (angle === 180) return { x: -x, y: -y };
+  if (angle === 270) return { x: -y, y: x };
+  return { x, y };
+}
+
 export function useMotionClassifier(config: AppConfig): HookResult {
   const [state, setState] = useState<MotionFlowState>("idle");
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -160,10 +188,10 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     // Full flip from baseline to opposite
     const flipped = cos <= -0.85;
 
-    // Direction: dominant delta in device x/y vs baseline
-    const dx = x - baseline.x;
-    const dy = y - baseline.y;
-    const side = dominantDirection4(dx, dy);
+    // Direction: use gravity-vector delta (more stable than raw accel deltas across devices).
+    const angle = getScreenAngleDeg();
+    const g = rotateToPortrait(curU.x - baseU.x, curU.y - baseU.y, angle);
+    const side = dominantDirection4(g.x, g.y);
 
     const swingAngle = 30;
     const resetAngle = 14;
@@ -174,13 +202,48 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
     // Mode=8 by speed: require a full flip, classify speed by duration.
     if (mode === 8 && strategy === "speed") {
-      // Decide speed early (near start of motion) to avoid any visible "switching" later.
-      // Previous (for rollback): startAngle=16, decideAngle=28, fastStartMs≈fastFlipMs*0.35 (cap 240ms)
-      // New: decide around ~35–40° so the prediction appears earlier during the flip, not only at the very end.
-      const startAngle = 12;
-      const decideAngle = 38;
-      const fastStartMs = Math.max(110, Math.min(220, Number(configRef.current.motion.fastFlipMs || 450) * 0.30));
-      const slowMinMs = Math.max(fastStartMs + 70, Math.min(420, Number(configRef.current.motion.fastFlipMs || 450) * 0.55));
+      // Speed sensitivity profiles:
+      // - Higher sensitivity starts earlier (smaller angle) and accepts "fast" more easily.
+      // - Lower sensitivity is stricter (helps reduce false fast/slow on shaky hands).
+      const fastFlipMs = Math.max(120, Number(configRef.current.motion.fastFlipMs || 450));
+      const sens = (configRef.current.motion as any)?.speedSensitivity as "low" | "medium" | "high" | undefined;
+      const speedSensitivity = sens === "low" || sens === "high" ? sens : "medium";
+
+      const profile =
+        speedSensitivity === "high"
+          ? {
+              startAngle: 8,
+              decideAngle: 28,
+              fastRatio: 0.52,
+              slowRatio: 0.74,
+              fastMin: 150,
+              fastMax: 340,
+              slowMax: 900
+            }
+          : speedSensitivity === "low"
+            ? {
+                startAngle: 18,
+                decideAngle: 48,
+                fastRatio: 0.26,
+                slowRatio: 0.84,
+                fastMin: 90,
+                fastMax: 220,
+                slowMax: 1200
+              }
+            : {
+                startAngle: 12,
+                decideAngle: 36,
+                fastRatio: 0.36,
+                slowRatio: 0.78,
+                fastMin: 120,
+                fastMax: 280,
+                slowMax: 1000
+              };
+
+      const startAngle = profile.startAngle;
+      const decideAngle = profile.decideAngle;
+      const fastStartMs = Math.max(profile.fastMin, Math.min(profile.fastMax, fastFlipMs * profile.fastRatio));
+      const slowMinMs = Math.max(fastStartMs + 90, Math.min(profile.slowMax, fastFlipMs * profile.slowRatio));
 
       if (flipStartAtRef.current === null) {
         if (angleDeg >= startAngle) {
@@ -192,8 +255,9 @@ export function useMotionClassifier(config: AppConfig): HookResult {
           flipDyRef.current = [];
         }
       } else {
-        flipDxRef.current.push(dx);
-        flipDyRef.current.push(dy);
+        // Store screen-normalized direction components for more consistent side detection.
+        flipDxRef.current.push(g.x);
+        flipDyRef.current.push(g.y);
 
         if (!flipDecidedRef.current && angleDeg >= decideAngle) {
           const dt = Math.max(0, t - flipStartAtRef.current);
@@ -212,16 +276,14 @@ export function useMotionClassifier(config: AppConfig): HookResult {
             const finalSide = flipSideRef.current;
             const predictionId = predictionIdFor(finalSide, speed, 8);
             setResult({ side: finalSide, speed, durationMs: dt, predictionId });
-            // Freeze early to avoid any visible "switch" later during the same flip.
-            lockedRef.current = true;
-            setState("locked");
-            return;
+            // Show the chosen prediction immediately, but don't "lock" until a full flip happens.
+            // This prevents any later switching while still allowing a clean final lock on flip.
+            setState("preview");
           }
         }
 
         if (flipped) {
           const durationMs = Math.max(0, t - flipStartAtRef.current);
-          const fastFlipMs = Math.max(120, Number(configRef.current.motion.fastFlipMs || 450));
 
           if (!flipDecidedRef.current) {
             const mx = mean(flipDxRef.current);
@@ -235,7 +297,8 @@ export function useMotionClassifier(config: AppConfig): HookResult {
           const speed = flipSpeedRef.current || (durationMs <= fastFlipMs ? "fast" : "slow");
           const predictionId = predictionIdFor(finalSide, speed, 8);
 
-          setResult({ side: finalSide, speed, durationMs, predictionId });
+          // Ensure the final lock uses the already-previewed values when available.
+          setResult((prev) => prev ?? { side: finalSide, speed, durationMs, predictionId });
           lockedRef.current = true;
           setState("locked");
           return;

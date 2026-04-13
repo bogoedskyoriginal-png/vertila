@@ -7,6 +7,7 @@ export type PredictionTemplate = {
   createdAt: number;
   mode: AppMode;
   mode8Strategy?: "speed" | "tilts";
+  speedSensitivity?: "low" | "medium" | "high";
   outputMode?: "drawings" | "links";
   predictions: Array<{
     id: PredictionId;

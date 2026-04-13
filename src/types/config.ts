@@ -47,6 +47,8 @@ export type MotionConfig = {
   fastFlipMs: number;
   // For mode=8: either distinguish outcomes by flip speed, or by 1/2 tilts.
   mode8Strategy: "speed" | "tilts";
+  // For mode=8 + speed strategy: early speed classification sensitivity.
+  speedSensitivity: "low" | "medium" | "high";
 };
 
 export type AppConfig = {

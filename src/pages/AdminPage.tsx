@@ -78,13 +78,15 @@ export function AdminPage() {
     [selectedTemplateId, templates]
   );
 
-  const showMode8StrategyToggle = outputMode === "drawings" && config.mode === 8;
-
   const effectiveStrategy: "speed" | "tilts" = (() => {
     if (outputMode === "links") return "tilts";
     if (config.mode !== 8) return "tilts";
     return config.motion?.mode8Strategy || "tilts";
   })();
+
+  const showMode8StrategyToggle = outputMode === "drawings" && config.mode === 8;
+  const showSpeedSensitivityToggle = showMode8StrategyToggle && effectiveStrategy === "speed";
+  const speedSensitivity = config.motion?.speedSensitivity || "medium";
 
   useEffect(() => {
     let cancelled = false;
@@ -272,6 +274,55 @@ export function AdminPage() {
               </div>
             )}
 
+            {showSpeedSensitivityToggle && (
+              <div className="card" style={{ padding: 12, borderRadius: 16 }}>
+                <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
+                  Чувствительность скорости
+                </div>
+                <div className="segmented" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+                  <button
+                    type="button"
+                    className={speedSensitivity === "low" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, speedSensitivity: "low" } };
+                      })
+                    }
+                  >
+                    Низкая
+                  </button>
+                  <button
+                    type="button"
+                    className={speedSensitivity === "medium" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, speedSensitivity: "medium" } };
+                      })
+                    }
+                  >
+                    Средняя
+                  </button>
+                  <button
+                    type="button"
+                    className={speedSensitivity === "high" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() =>
+                      setRemote((prev) => {
+                        const base = prev ?? DEFAULT_CONFIG;
+                        return { ...base, motion: { ...base.motion, speedSensitivity: "high" } };
+                      })
+                    }
+                  >
+                    Высокая
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="card" style={{ padding: 12, borderRadius: 16 }}>
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Шаблоны</div>
               <input
@@ -287,14 +338,15 @@ export function AdminPage() {
                 disabled={!!remoteError || !templateName.trim()}
                 onClick={() => {
                   const name = templateName.trim();
-                  const t: PredictionTemplate = {
-                    id: makeTemplateId(),
-                    name,
-                    createdAt: Date.now(),
-                    mode: config.mode,
-                    mode8Strategy: effectiveStrategy,
-                    outputMode,
-                    predictions: DEFAULT_CONFIG.predictions.map((base) => {
+	                  const t: PredictionTemplate = {
+	                    id: makeTemplateId(),
+	                    name,
+	                    createdAt: Date.now(),
+	                    mode: config.mode,
+	                    mode8Strategy: effectiveStrategy,
+	                    speedSensitivity,
+	                    outputMode,
+	                    predictions: DEFAULT_CONFIG.predictions.map((base) => {
                       const prev = config.predictions.find((p) => p.id === base.id);
                       return {
                         id: base.id,
@@ -340,16 +392,22 @@ export function AdminPage() {
                   setRemote((prev) => {
                     const base = prev ?? DEFAULT_CONFIG;
                     const byId = new Map(selectedTemplate.predictions.map((p) => [p.id, p]));
-                    const nextOutput: OutputMode = (selectedTemplate.outputMode as OutputMode) || "drawings";
-                    const nextStrategy: "speed" | "tilts" =
-                      nextOutput === "links" ? "tilts" : (selectedTemplate.mode8Strategy as any) || base.motion.mode8Strategy;
+	                    const nextOutput: OutputMode = (selectedTemplate.outputMode as OutputMode) || "drawings";
+	                    const nextStrategy: "speed" | "tilts" =
+	                      nextOutput === "links" ? "tilts" : (selectedTemplate.mode8Strategy as any) || base.motion.mode8Strategy;
+	                    const nextSens: "low" | "medium" | "high" =
+	                      (selectedTemplate.speedSensitivity as any) === "low"
+	                        ? "low"
+	                        : (selectedTemplate.speedSensitivity as any) === "high"
+	                          ? "high"
+	                          : "medium";
 
-                    return {
-                      ...base,
-                      mode: selectedTemplate.mode,
-                      outputMode: nextOutput,
-                      motion: { ...base.motion, mode8Strategy: nextStrategy },
-                      predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
+	                    return {
+	                      ...base,
+	                      mode: selectedTemplate.mode,
+	                      outputMode: nextOutput,
+	                      motion: { ...base.motion, mode8Strategy: nextStrategy, speedSensitivity: nextSens },
+	                      predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
                         const found = byId.get(pBase.id);
                         if (!found) return { ...pBase, linkQuery: "" };
                         return {
