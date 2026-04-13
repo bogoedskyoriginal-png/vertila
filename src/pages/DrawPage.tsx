@@ -205,7 +205,14 @@ export function DrawPage() {
   };
 
   if (outputMode === "links") {
-    const theme = config.linkUiTheme === "light" ? "light" : "dark";
+    const theme =
+      config.linkUiTheme === "light"
+        ? "light"
+        : config.linkUiTheme === "dark"
+          ? "dark"
+          : window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches
+            ? "light"
+            : "dark";
     return (
       <div className="spectatorPageRoot appFullHeight" style={{ padding: 0 }}>
         <div style={{ height: "100%" }} onClickCapture={() => handleFourTaps({ clearCanvas: false })}>

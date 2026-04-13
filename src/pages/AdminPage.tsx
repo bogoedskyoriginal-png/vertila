@@ -70,7 +70,10 @@ export function AdminPage() {
 
   const config = remote ?? DEFAULT_CONFIG;
   const outputMode: OutputMode = config.outputMode || "drawings";
-  const linkUiTheme: LinkUiTheme = config.linkUiTheme === "light" ? "light" : "dark";
+  const linkUiTheme: LinkUiTheme =
+    config.linkUiTheme === "light" || config.linkUiTheme === "dark" || config.linkUiTheme === "system"
+      ? config.linkUiTheme
+      : "system";
   const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
   const predictionMap = useMemo(() => new Map(config.predictions.map((p) => [p.id, p])), [config.predictions]);
 
@@ -209,7 +212,7 @@ export function AdminPage() {
                       return {
                         ...base,
                         outputMode: "links",
-                        linkUiTheme: base.linkUiTheme || "dark",
+                        linkUiTheme: base.linkUiTheme || "system",
                         motion: { ...base.motion, mode8Strategy: "tilts" }
                       };
                     })
@@ -226,6 +229,14 @@ export function AdminPage() {
                   Дизайн страницы
                 </div>
                 <div className="segmented segmentedOneCol">
+                  <button
+                    type="button"
+                    className={linkUiTheme === "system" ? "segBtn segBtnActive" : "segBtn"}
+                    disabled={!!remoteError}
+                    onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), linkUiTheme: "system" }))}
+                  >
+                    По умолчанию
+                  </button>
                   <button
                     type="button"
                     className={linkUiTheme === "dark" ? "segBtn segBtnActive" : "segBtn"}

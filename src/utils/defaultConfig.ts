@@ -22,7 +22,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   version: 2,
   mode: 4,
   outputMode: "drawings",
-  linkUiTheme: "dark",
+  linkUiTheme: "system",
   predictions: ([1, 2, 3, 4, 5, 6, 7, 8] as const).map((id) => ({
     id,
     label: labelFor(id),
