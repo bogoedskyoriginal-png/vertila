@@ -29,20 +29,8 @@ function MicIcon() {
         strokeWidth="1.8"
         strokeLinecap="round"
       />
-      <path
-        d="M19 11a7 7 0 0 1-14 0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M12 18v3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
+      <path d="M19 11a7 7 0 0 1-14 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 18v3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       <path d="M9 21h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
@@ -76,9 +64,25 @@ function Spinner() {
   return <span className="linkGoogleSpinner" aria-hidden="true" />;
 }
 
-export function GoogleMockPage({ priming, charging, theme }: Props) {
+function ColoredGoogleWordmark() {
   return (
-    <div className={theme === "light" ? "linkGoogleRoot linkGoogleRootLight" : "linkGoogleRoot"} aria-label="search">
+    <>
+      <span className="gL gBlue">G</span>
+      <span className="gL gRed">o</span>
+      <span className="gL gYellow">o</span>
+      <span className="gL gBlue">g</span>
+      <span className="gL gGreen">l</span>
+      <span className="gL gRed">e</span>
+    </>
+  );
+}
+
+export function GoogleMockPage({ priming, charging, theme }: Props) {
+  const rootClass = theme === "light" ? "linkGoogleRoot linkGoogleRootLight" : "linkGoogleRoot";
+  const showColoredLogo = theme === "light";
+
+  return (
+    <div className={rootClass} aria-label="search">
       <div className="linkGoogleTop">
         <div className="linkGoogleTopRight">
           <button type="button" className="linkGoogleIconBtn" aria-label="notifications">
@@ -88,19 +92,15 @@ export function GoogleMockPage({ priming, charging, theme }: Props) {
             Д
           </div>
         </div>
+
         <div className="linkGoogleLogo" aria-hidden="true">
-          <span className="gL gBlue">G</span>
-          <span className="gL gRed">o</span>
-          <span className="gL gYellow">o</span>
-          <span className="gL gBlue">g</span>
-          <span className="gL gGreen">l</span>
-          <span className="gL gRed">e</span>
+          {showColoredLogo ? <ColoredGoogleWordmark /> : "Google"}
         </div>
       </div>
 
       <div className="linkGoogleSearch">
         <div className="linkGoogleSearchInner" aria-label="search bar">
-          <div className="linkGoogleSearchIcon">
+          <div className="linkGoogleSearchIcon" aria-hidden="true">
             <SearchIcon />
           </div>
           <div className="linkGoogleSearchText" aria-hidden="true" />
@@ -129,3 +129,4 @@ export function GoogleMockPage({ priming, charging, theme }: Props) {
     </div>
   );
 }
+
