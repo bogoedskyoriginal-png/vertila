@@ -326,6 +326,8 @@ textarea {
 .toolBtn {
   width: 44px;
   height: 44px;
+  padding: 0;
+  line-height: 0;
   border-radius: 14px;
   border: 1px solid rgba(17, 24, 39, 0.12);
   background: #fff;
@@ -335,6 +337,10 @@ textarea {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   position: relative;
+}
+
+.toolBtn svg {
+  display: block;
 }
 
 .toolBtnActive {
