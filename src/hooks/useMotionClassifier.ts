@@ -124,6 +124,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
   const listenerAttachedRef = useRef(false);
   const lockedRef = useRef(false);
+  const previewSideRef = useRef<Direction4 | null>(null);
 
   const swingCountRef = useRef(0);
   const inSwingRef = useRef(false);
@@ -276,9 +277,11 @@ export function useMotionClassifier(config: AppConfig): HookResult {
             const finalSide = flipSideRef.current;
             const predictionId = predictionIdFor(finalSide, speed, 8);
             setResult({ side: finalSide, speed, durationMs: dt, predictionId });
-            // Show the chosen prediction immediately, but don't "lock" until a full flip happens.
-            // This prevents any later switching while still allowing a clean final lock on flip.
-            setState("preview");
+            // Lock immediately once speed/side is decided (even if performer aborts the flip).
+            previewSideRef.current = finalSide;
+            lockedRef.current = true;
+            setState("locked");
+            return;
           }
         }
 
@@ -320,6 +323,13 @@ export function useMotionClassifier(config: AppConfig): HookResult {
 
     // Swing detection with hysteresis: count excursions beyond swingAngle.
     if (!inSwingRef.current && angleDeg >= swingAngle) {
+      // Once we have previewed a side in this session, do not allow switching to a different side.
+      // This prevents "top -> left" changes if the phone is moved around before a full flip.
+      if (previewSideRef.current && side !== previewSideRef.current) {
+        inSwingRef.current = true;
+        return;
+      }
+
       inSwingRef.current = true;
       swingCountRef.current += 1;
 
@@ -328,8 +338,13 @@ export function useMotionClassifier(config: AppConfig): HookResult {
       const predictionId = predictionIdFor(side, speed, mode);
 
       setResult({ side, speed, durationMs: 0, predictionId });
+      previewSideRef.current = side;
 
       if (outputMode === "links" && mode === 4) {
+        lockedRef.current = true;
+        setState("locked");
+      } else if (mode === 4) {
+        // For 4 outcomes: once a prediction is shown, it must not change until re-armed.
         lockedRef.current = true;
         setState("locked");
       } else if (count >= 2 && mode === 8) {
@@ -370,6 +385,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     baselineUnitRef.current = null;
     swingCountRef.current = 0;
     inSwingRef.current = false;
+    previewSideRef.current = null;
     flipStartAtRef.current = null;
     flipSideRef.current = null;
     flipSpeedRef.current = null;
@@ -416,6 +432,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     lockedRef.current = false;
     swingCountRef.current = 0;
     inSwingRef.current = false;
+    previewSideRef.current = null;
     flipStartAtRef.current = null;
     flipSideRef.current = null;
     flipSpeedRef.current = null;
@@ -475,6 +492,7 @@ export function useMotionClassifier(config: AppConfig): HookResult {
     samplesRef.current = [];
     swingCountRef.current = 0;
     inSwingRef.current = false;
+    previewSideRef.current = null;
     flipStartAtRef.current = null;
     flipSideRef.current = null;
     flipSpeedRef.current = null;
