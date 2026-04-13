@@ -12,7 +12,8 @@ type Props = {
   priming: boolean;
 };
 
-function TinyIndicator({ active, error }: { active: boolean; error: boolean }) {
+function PrimingIndicator({ active }: { active: boolean }) {
+  if (!active) return null;
   return (
     <div
       aria-hidden="true"
@@ -20,15 +21,12 @@ function TinyIndicator({ active, error }: { active: boolean; error: boolean }) {
         width: 44,
         height: 44,
         borderRadius: 14,
-        border: "1px solid rgba(17, 24, 39, 0.12)",
-        background: "#fff",
         display: "grid",
         placeItems: "center",
         position: "relative"
       }}
     >
-      {active ? <span className="spinnerRing" aria-hidden="true" style={{ inset: -4 }} /> : <span style={{ width: 8, height: 8, borderRadius: 999, background: "rgba(17,24,39,0.18)" }} />}
-      {error && <span className="errorDot" aria-hidden="true" />}
+      <span className="spinnerRing" aria-hidden="true" style={{ inset: 2, borderColor: "rgba(17, 24, 39, 0.12)" }} />
     </div>
   );
 }
@@ -54,7 +52,7 @@ export function SpectatorToolbar({
           onSelectTool={onSelectTool}
         />
 
-        <TinyIndicator active={priming} error={hasError} />
+        <PrimingIndicator active={priming} />
       </div>
     </div>
   );
