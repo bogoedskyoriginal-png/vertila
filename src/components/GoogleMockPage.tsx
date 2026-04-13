@@ -42,13 +42,7 @@ function MicIcon() {
         strokeWidth="1.8"
         strokeLinecap="round"
       />
-      <path
-        d="M9 21h6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
+      <path d="M9 21h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -73,14 +67,6 @@ function SearchIcon() {
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
       <path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
       <path d="M16.5 16.5 21 21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -129,15 +115,12 @@ export function GoogleMockPage({ priming, charging }: Props) {
 
       <div className="linkGoogleBody" aria-hidden="true" />
 
-      <div className="linkGoogleBottom" aria-label="bottom search bar">
-        <div className="linkGoogleBottomLeft" aria-hidden="true">
-          <MenuIcon />
+      {(priming || charging) && (
+        <div className="linkGoogleSpinnerFloat" aria-hidden="true">
+          <Spinner />
         </div>
-        <div className="linkGoogleBottomField" aria-hidden="true" />
-        <div className="linkGoogleBottomRight" aria-hidden="true">
-          {(priming || charging) && <Spinner />}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
+
