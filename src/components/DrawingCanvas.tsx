@@ -71,6 +71,7 @@ export function DrawingCanvas({
           display: "block",
           width: "100%",
           height: "100%",
+          touchAction: "none",
           background: "#fff"
         }}
       />

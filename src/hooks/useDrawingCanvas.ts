@@ -396,15 +396,30 @@ export function useDrawingCanvas({
     const parent = canvas.parentElement;
     if (!parent) return;
 
+    const applySize = (width: number, height: number) => {
+      // iOS/Safari can briefly report 0x0 during viewport transitions.
+      // If we apply that, canvas becomes effectively non-drawable (height ~ 1px).
+      if (width < 40 || height < 40) return;
+      setSizePreservingContent(width, height);
+    };
+
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
       const box = entry.contentRect;
-      setSizePreservingContent(Math.floor(box.width), Math.floor(box.height));
+      applySize(Math.floor(box.width), Math.floor(box.height));
     });
 
     ro.observe(parent);
-    return () => ro.disconnect();
+    // Fallback: force one measurement on next frame (helps if RO fires before layout settles).
+    const raf = window.requestAnimationFrame(() => {
+      const rect = parent.getBoundingClientRect();
+      applySize(Math.floor(rect.width), Math.floor(rect.height));
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
   }, [setSizePreservingContent]);
 
   return {
