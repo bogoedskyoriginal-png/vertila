@@ -48,7 +48,8 @@ textarea {
 }
 
 .spectatorPageRoot {
-  height: 100%;
+  /* Use svh directly; % height can shrink on iOS (even with html/body set to 100%). */
+  height: 100svh;
   min-height: 100svh;
   padding: 0;
   box-sizing: border-box;

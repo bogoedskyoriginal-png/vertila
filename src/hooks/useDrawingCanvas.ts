@@ -254,8 +254,25 @@ export function useDrawingCanvas({
     }
   }, []);
 
+  const ensureCanvasSize = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const cssW = Math.floor(rect.width);
+    const cssH = Math.floor(rect.height);
+    if (cssW < 40 || cssH < 40) return;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const targetW = Math.max(1, Math.floor(cssW * dpr));
+    const targetH = Math.max(1, Math.floor(cssH * dpr));
+    // Only resize when meaningfully off (prevents thrash).
+    if (Math.abs(canvas.width - targetW) > 2 || Math.abs(canvas.height - targetH) > 2) {
+      setSizePreservingContent(cssW, cssH);
+    }
+  }, [setSizePreservingContent]);
+
   const start = useCallback(
     (clientX: number, clientY: number) => {
+      ensureCanvasSize();
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
@@ -275,7 +292,7 @@ export function useDrawingCanvas({
         points: [getNormalizedPoint(canvas, clientX, clientY)]
       };
     },
-    [applyStrokeStyle, color, eraserWidth, lineWidth, tool]
+    [applyStrokeStyle, color, ensureCanvasSize, eraserWidth, lineWidth, tool]
   );
 
   const flushDraw = useCallback(() => {
