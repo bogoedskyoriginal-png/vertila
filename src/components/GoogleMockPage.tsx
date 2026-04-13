@@ -120,6 +120,7 @@ export function GoogleMockPage({ priming, charging }: Props) {
       </div>
 
       <div className="linkGoogleTabs" aria-hidden="true">
+        <div className="linkGoogleTab">Режим ИИ</div>
         <div className="linkGoogleTab">Все</div>
         <div className="linkGoogleTab linkGoogleTabActive">Картинки</div>
         <div className="linkGoogleTab">Видео</div>
@@ -140,4 +141,3 @@ export function GoogleMockPage({ priming, charging }: Props) {
     </div>
   );
 }
-
