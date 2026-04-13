@@ -34,30 +34,12 @@ function BrushIcon() {
 function EraserIcon() {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      {/* Filled eraser (uses currentColor -> black when inactive, white when active) */}
       <path
-        d="M7.5 14.5 14 8a2.2 2.2 0 0 1 3.1 0l1 1a2.2 2.2 0 0 1 0 3.1l-5.6 5.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        d="M8.2 15.6 14.6 9.2a2.4 2.4 0 0 1 3.4 0l.9.9a2.4 2.4 0 0 1 0 3.4l-4.7 4.7H8.8L6.5 16a2 2 0 0 1 0-2.8l1.7-1.6Z"
+        fill="currentColor"
       />
-      <path
-        d="M7.5 14.5 5 17a2 2 0 0 0 0 2.8l.2.2h7.6l4.7-4.7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M13 20h8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M14 18.2h7" fill="currentColor" opacity="0.55" />
     </svg>
   );
 }
@@ -105,4 +87,3 @@ export function PaletteToolbar({ colors, selectedColor, tool, onSelectColor, onS
     </div>
   );
 }
-
