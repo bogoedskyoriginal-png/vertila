@@ -108,15 +108,12 @@ function normalizeConfig(input) {
     return {
       version: 2,
       mode: input.mode === 8 ? 8 : 4,
-      outputMode: "drawings",
-      linkUiTheme: DEFAULT_CONFIG.linkUiTheme || "system",
       predictions: DEFAULT_CONFIG.predictions.map((base) => {
         const prev = byId.get(base.id);
         return {
           id: base.id,
           label: base.label,
           imageDataUrl: String(prev?.imageDataUrl || ""),
-          linkQuery: "",
           drawing: { v: 1, aspect: 9 / 16, strokes: [] }
         };
       }),
@@ -137,32 +134,19 @@ function normalizeConfig(input) {
   const byId = new Map();
   for (const p of preds) byId.set(Number(p?.id), p);
 
-  const out = String(input.outputMode || "");
-  const outputMode = out === "links" ? "links" : DEFAULT_CONFIG.outputMode;
-
-  const rawTheme = String(input.linkUiTheme || "");
-  const linkUiTheme =
-    rawTheme === "light" || rawTheme === "dark" || rawTheme === "system"
-      ? rawTheme
-      : (DEFAULT_CONFIG.linkUiTheme || "system");
-
   const sens = String(input.motion?.speedSensitivity || "");
   const speedSensitivity = sens === "low" || sens === "high" ? sens : "medium";
 
   return {
     version: 2,
     mode,
-    outputMode,
-    linkUiTheme,
     predictions: DEFAULT_CONFIG.predictions.map((base) => {
       const prev = byId.get(base.id);
       const prevDrawing = prev?.drawing;
-      const linkQuery = typeof prev?.linkQuery === "string" ? prev.linkQuery : "";
       return {
         id: base.id,
         label: base.label,
         imageDataUrl: String(prev?.imageDataUrl || ""),
-        linkQuery,
         drawing:
           prevDrawing && prevDrawing.v === 1 && Array.isArray(prevDrawing.strokes)
             ? prevDrawing

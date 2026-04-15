@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { AppConfig, AppMode, LinkUiTheme, OutputMode, PredictionDrawing, PredictionId } from "../types/config";
+import type { AppConfig, AppMode, PredictionDrawing, PredictionId } from "../types/config";
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet, apiSend } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
@@ -33,13 +33,6 @@ function updatePredictionDrawing(config: AppConfig, id: PredictionId, drawing: P
   };
 }
 
-function updatePredictionLinkQuery(config: AppConfig, id: PredictionId, linkQuery: string): AppConfig {
-  return {
-    ...config,
-    predictions: config.predictions.map((p) => (p.id === id ? { ...p, linkQuery } : p))
-  };
-}
-
 function labelForId(id: PredictionId, strategy: "speed" | "tilts") {
   const isSecond = id >= 5;
   const base = ((id - 1) % 4) + 1;
@@ -69,11 +62,6 @@ export function AdminPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const config = remote ?? DEFAULT_CONFIG;
-  const outputMode: OutputMode = config.outputMode || "drawings";
-  const linkUiTheme: LinkUiTheme =
-    config.linkUiTheme === "light" || config.linkUiTheme === "dark" || config.linkUiTheme === "system"
-      ? config.linkUiTheme
-      : "system";
   const activeIds = useMemo(() => predictionIdsForMode(config.mode), [config.mode]);
   const predictionMap = useMemo(() => new Map(config.predictions.map((p) => [p.id, p])), [config.predictions]);
 
@@ -83,12 +71,11 @@ export function AdminPage() {
   );
 
   const effectiveStrategy: "speed" | "tilts" = (() => {
-    if (outputMode === "links") return "tilts";
     if (config.mode !== 8) return "tilts";
     return config.motion?.mode8Strategy || "tilts";
   })();
 
-  const showMode8StrategyToggle = outputMode === "drawings" && config.mode === 8;
+  const showMode8StrategyToggle = config.mode === 8;
   const showSpeedSensitivityToggle = showMode8StrategyToggle && effectiveStrategy === "speed";
   const speedSensitivity = config.motion?.speedSensitivity || "medium";
 
@@ -136,24 +123,12 @@ export function AdminPage() {
       <div key={id} style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.6 }}>{labelForId(id, effectiveStrategy)}</div>
-          {outputMode === "drawings" ? (
-            <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
-              Редактировать
-            </button>
-          ) : null}
+          <button className="btn" onClick={() => setOpenEditor(id)} style={{ padding: "6px 10px", minHeight: 38 }}>
+            Редактировать
+          </button>
         </div>
 
-        {outputMode === "drawings" ? (
-          <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
-        ) : (
-          <input
-            className="input"
-            value={String(p.linkQuery || "")}
-            onChange={(e) => setRemote((prev) => updatePredictionLinkQuery(prev ?? DEFAULT_CONFIG, id, e.target.value))}
-            placeholder="Запрос для Google Картинок"
-            style={{ minHeight: 46 }}
-          />
-        )}
+        <PredictionThumbnail drawing={p.drawing} imageDataUrl={p.imageDataUrl} maxHeight={240} />
       </div>
     );
   }
@@ -184,79 +159,6 @@ export function AdminPage() {
 
         <div className="adminLayoutGrid">
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-            <div className="card" style={{ padding: 12, borderRadius: 16 }}>
-              <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
-                Тип предсказаний
-              </div>
-              <div className="segmented">
-                <button
-                  type="button"
-                  className={outputMode === "drawings" ? "segBtn segBtnActive" : "segBtn"}
-                  disabled={!!remoteError}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return { ...base, outputMode: "drawings" };
-                    })
-                  }
-                >
-                  Рисунки
-                </button>
-                <button
-                  type="button"
-                  className={outputMode === "links" ? "segBtn segBtnActive" : "segBtn"}
-                  disabled={!!remoteError}
-                  onClick={() =>
-                    setRemote((prev) => {
-                      const base = prev ?? DEFAULT_CONFIG;
-                      return {
-                        ...base,
-                        outputMode: "links",
-                        linkUiTheme: base.linkUiTheme || "system",
-                        motion: { ...base.motion, mode8Strategy: "tilts" }
-                      };
-                    })
-                  }
-                >
-                  Ссылки
-                </button>
-              </div>
-            </div>
-
-            {outputMode === "links" && (
-              <div className="card" style={{ padding: 12, borderRadius: 16 }}>
-                <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
-                  Дизайн страницы
-                </div>
-                <div className="segmented segmentedOneCol">
-                  <button
-                    type="button"
-                    className={linkUiTheme === "system" ? "segBtn segBtnActive" : "segBtn"}
-                    disabled={!!remoteError}
-                    onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), linkUiTheme: "system" }))}
-                  >
-                    По умолчанию
-                  </button>
-                  <button
-                    type="button"
-                    className={linkUiTheme === "dark" ? "segBtn segBtnActive" : "segBtn"}
-                    disabled={!!remoteError}
-                    onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), linkUiTheme: "dark" }))}
-                  >
-                    Тёмный
-                  </button>
-                  <button
-                    type="button"
-                    className={linkUiTheme === "light" ? "segBtn segBtnActive" : "segBtn"}
-                    disabled={!!remoteError}
-                    onClick={() => setRemote((prev) => ({ ...(prev ?? DEFAULT_CONFIG), linkUiTheme: "light" }))}
-                  >
-                    Светлый
-                  </button>
-                </div>
-              </div>
-            )}
-
             <div className="card" style={{ padding: 12, borderRadius: 16 }}>
               <div className="hint" style={{ fontWeight: 800, marginBottom: 8 }}>
                 Количество предсказаний
@@ -388,13 +290,11 @@ export function AdminPage() {
 	                    mode: config.mode,
 	                    mode8Strategy: effectiveStrategy,
 	                    speedSensitivity,
-	                    outputMode,
 	                    predictions: DEFAULT_CONFIG.predictions.map((base) => {
                       const prev = config.predictions.find((p) => p.id === base.id);
                       return {
                         id: base.id,
                         imageDataUrl: String(prev?.imageDataUrl || ""),
-                        linkQuery: String(prev?.linkQuery || ""),
                         drawing:
                           prev?.drawing && prev.drawing.v === 1
                             ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }
@@ -435,28 +335,25 @@ export function AdminPage() {
                   setRemote((prev) => {
                     const base = prev ?? DEFAULT_CONFIG;
                     const byId = new Map(selectedTemplate.predictions.map((p) => [p.id, p]));
-	                    const nextOutput: OutputMode = (selectedTemplate.outputMode as OutputMode) || "drawings";
-	                    const nextStrategy: "speed" | "tilts" =
-	                      nextOutput === "links" ? "tilts" : (selectedTemplate.mode8Strategy as any) || base.motion.mode8Strategy;
-	                    const nextSens: "low" | "medium" | "high" =
-	                      (selectedTemplate.speedSensitivity as any) === "low"
-	                        ? "low"
-	                        : (selectedTemplate.speedSensitivity as any) === "high"
-	                          ? "high"
-	                          : "medium";
+                    const nextStrategy: "speed" | "tilts" =
+                      (selectedTemplate.mode8Strategy as any) === "speed" ? "speed" : "tilts";
+                    const nextSens: "low" | "medium" | "high" =
+                      (selectedTemplate.speedSensitivity as any) === "low"
+                        ? "low"
+                        : (selectedTemplate.speedSensitivity as any) === "high"
+                          ? "high"
+                          : "medium";
 
-	                    return {
-	                      ...base,
-	                      mode: selectedTemplate.mode,
-	                      outputMode: nextOutput,
-	                      motion: { ...base.motion, mode8Strategy: nextStrategy, speedSensitivity: nextSens },
-	                      predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
+                    return {
+                      ...base,
+                      mode: selectedTemplate.mode,
+                      motion: { ...base.motion, mode8Strategy: nextStrategy, speedSensitivity: nextSens },
+                      predictions: DEFAULT_CONFIG.predictions.map((pBase) => {
                         const found = byId.get(pBase.id);
-                        if (!found) return { ...pBase, linkQuery: "" };
+                        if (!found) return pBase;
                         return {
                           ...pBase,
                           imageDataUrl: String(found.imageDataUrl || ""),
-                          linkQuery: String(found.linkQuery || ""),
                           drawing:
                             found.drawing && found.drawing.v === 1
                               ? found.drawing
@@ -489,7 +386,7 @@ export function AdminPage() {
 
           <div className="card" style={{ padding: 14, borderRadius: 16 }}>
             <div style={{ fontWeight: 800, marginBottom: 12 }}>
-              {outputMode === "drawings" ? "Предсказания (рисунки)" : "Предсказания (запросы)"}
+              Предсказания (рисунки)
             </div>
 
             <div className="adminCross">
@@ -508,14 +405,12 @@ export function AdminPage() {
                   try {
                     const toSave: AppConfig = {
                       ...config,
-                      outputMode,
                       motion: { ...config.motion, mode8Strategy: effectiveStrategy },
                       predictions: DEFAULT_CONFIG.predictions.map((base) => {
                         const prev = config.predictions.find((p) => p.id === base.id);
                         return {
                           ...base,
                           imageDataUrl: String(prev?.imageDataUrl || ""),
-                          linkQuery: String(prev?.linkQuery || ""),
                           drawing:
                             prev?.drawing && prev.drawing.v === 1
                               ? { ...prev.drawing, aspect: prev.drawing.aspect ?? 9 / 16 }

@@ -9,7 +9,6 @@ import type { AppConfig, PredictionDrawing, PredictionId } from "../types/config
 import { DEFAULT_CONFIG } from "../utils/defaultConfig";
 import { apiGet } from "../utils/api";
 import type { UserConfigResponse } from "../types/api";
-import { GoogleMockPage } from "../components/GoogleMockPage";
 import { loadCachedUserConfig, saveCachedUserConfig } from "../utils/userConfigCache";
 
 const COLORS = ["#111827", "#2563eb", "#b91c1c", "#16a34a"];
@@ -32,17 +31,6 @@ function findPredictionDrawing(config: AppConfig, id: PredictionId): PredictionD
   return null;
 }
 
-function buildGoogleImagesUrl(queryOrUrl: string): string | null {
-  const q = String(queryOrUrl || "").trim();
-  if (!q) return null;
-  const lower = q.toLowerCase();
-  if (lower.startsWith("http://") || lower.startsWith("https://")) return q;
-  const url = new URL("https://www.google.com/search");
-  url.searchParams.set("tbm", "isch");
-  url.searchParams.set("q", q);
-  return url.toString();
-}
-
 export function DrawPage() {
   const params = useParams();
   const code = normalizeCode(params.code);
@@ -58,12 +46,10 @@ export function DrawPage() {
 
   const config = remoteConfig ?? cachedConfig ?? DEFAULT_CONFIG;
   const motion = useMotionClassifier(config);
-  const outputMode = config.outputMode || "drawings";
 
   const baseSnapshotRef = useRef<string | null>(null);
   const lastPredictionIdRef = useRef<number | null>(null);
   const [flash, setFlash] = useState(0);
-  const redirectedRef = useRef(false);
 
   const [priming, setPriming] = useState(false);
   const tapTimesRef = useRef<number[]>([]);
@@ -79,7 +65,6 @@ export function DrawPage() {
       setCachedConfig(loadCachedUserConfig(code));
       baseSnapshotRef.current = null;
       lastPredictionIdRef.current = null;
-      redirectedRef.current = false;
       try {
         const data = await apiGet<UserConfigResponse>(`/api/users/${encodeURIComponent(code)}/config`);
         if (cancelled) return;
@@ -125,17 +110,6 @@ export function DrawPage() {
       if (!motion.result) return;
       if (motion.state !== "preview" && motion.state !== "locked") return;
 
-      if (outputMode === "links") {
-        if (motion.state !== "locked") return;
-        if (redirectedRef.current) return;
-        const p = config.predictions.find((x) => x.id === motion.result?.predictionId);
-        const target = buildGoogleImagesUrl(String(p?.linkQuery || ""));
-        if (!target) return;
-        redirectedRef.current = true;
-        window.location.replace(target);
-        return;
-      }
-
       if (!canvasApi) return;
 
       const predId = Number(motion.result.predictionId);
@@ -159,7 +133,7 @@ export function DrawPage() {
       await canvasApi.drawFromDataUrl(img, { clear: false });
     }
     apply().catch(() => undefined);
-  }, [canvasApi, config, motion.result, motion.state, outputMode]);
+  }, [canvasApi, config, motion.result, motion.state]);
 
   const spectatorUi = useMemo(() => {
     if (remoteError) {
@@ -194,7 +168,6 @@ export function DrawPage() {
     setPriming(true);
     primingTimerRef.current = window.setTimeout(() => setPriming(false), 1000);
 
-    redirectedRef.current = false;
     if (opts.clearCanvas) {
       baseSnapshotRef.current = null;
       lastPredictionIdRef.current = null;
@@ -203,24 +176,6 @@ export function DrawPage() {
     }
     void motion.arm();
   };
-
-  if (outputMode === "links") {
-    const theme =
-      config.linkUiTheme === "light"
-        ? "light"
-        : config.linkUiTheme === "dark"
-          ? "dark"
-          : window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches
-            ? "light"
-            : "dark";
-    return (
-      <div className="spectatorPageRoot appFullHeight" style={{ padding: 0 }}>
-        <div style={{ height: "100%" }} onClickCapture={() => handleFourTaps({ clearCanvas: false })}>
-          <GoogleMockPage priming={priming} charging={charging} theme={theme} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="spectatorPageRoot appFullHeight">

@@ -21,13 +21,10 @@ function labelFor(id: PredictionId) {
 export const DEFAULT_CONFIG: AppConfig = {
   version: 2,
   mode: 4,
-  outputMode: "drawings",
-  linkUiTheme: "system",
   predictions: ([1, 2, 3, 4, 5, 6, 7, 8] as const).map((id) => ({
     id,
     label: labelFor(id),
     imageDataUrl: "",
-    linkQuery: "",
     drawing: { v: 1, aspect: 9 / 16, strokes: [] }
   })),
   motion: {

@@ -8,12 +8,10 @@ export type PredictionTemplate = {
   mode: AppMode;
   mode8Strategy?: "speed" | "tilts";
   speedSensitivity?: "low" | "medium" | "high";
-  outputMode?: "drawings" | "links";
   predictions: Array<{
     id: PredictionId;
     drawing: PredictionDrawing;
     imageDataUrl: string;
-    linkQuery?: string;
   }>;
 };
 
